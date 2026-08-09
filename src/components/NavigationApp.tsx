@@ -53,7 +53,9 @@ export default function NavigationApp({ initialData }: { initialData?: Payload }
   }
 
   useEffect(() => {
-    if (!initialData) {
+    // Check client-side cookie to ensure authenticated state is not lost due to SSR ISR caching
+    const hasSessionCookie = typeof document !== 'undefined' && document.cookie.includes('navigation_session=')
+    if (!initialData || (hasSessionCookie && !initialData.authenticated)) {
       refresh()
     } else {
       setLoading(false)
