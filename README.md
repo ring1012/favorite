@@ -1,42 +1,42 @@
-# Orbit Navigation - EdgeOne Pages Next.js Template
+# Orbit 网址导航 - EdgeOne Pages Next.js 模板
 
-A modern, high-performance website navigation system built with **Next.js 15** and **Tencent EdgeOne Pages**.
+基于 **Next.js 15** 与 **Tencent EdgeOne Pages** 打造的高性能现代网址导航系统。
 
-## Key Architectural Features
+## 架构与缓存策略
 
-- **Dynamic Home Page (`/`)**: Non-cached (Dynamic Rendering). Evaluates user sessions on every request.
-- **User Navigation Page (`/nav/[user]`)**: Pure ISR (Incremental Static Regeneration) static page with a 60-second revalidation period (`revalidate = 60`).
-- **Unprotected GET for ISR Preloading**: To support static ISR page generation at build/request time without reading user cookies, `GET /api/navigation?username=<username>` is publicly accessible to fetch a user's navigation structure.
-- **Protected Mutations**: Any modifications (`POST /api/navigation`) strictly require a valid user JWT session cookie (`navigation_session`).
-- **ISR Cache Purging**: Upon navigation edits, the backend invokes `revalidatePath('/nav/<user>')` to clear the static ISR cache immediately.
+- **主页 (`/`)**：非缓存页面（动态渲染 Dynamic Rendering），每次请求实时响应。
+- **用户导航页 (`/nav/[user]`)**：标准的 ISR（增量静态生成）静态页面，缓存周期为 60 秒（`revalidate = 60`）。
+- **ISR 预加载数据接口**：由于 ISR 页面需要在服务端提前渲染加载用户数据且不依赖 Cookie，`GET /api/navigation?username=<username>` 接口未加 Cookie 强鉴权保护，可直接获取公开导航数据。
+- **编辑操作安全保护**：导航及分类的任何增删改操作（`POST /api/navigation`）均需经过 JWT Session Cookie（`navigation_session`）严格校验。
+- **ISR 缓存自动刷新**：用户在编辑保存导航时，后端会触发 `revalidatePath('/nav/' + user)` 立即清除对应 `/nav/[user]` 路径的 ISR 静态缓存。
 
-## Environment Variables
+## 环境变量配置
 
-The application requires the following environment variables:
+部署与运行需设置以下两个环境变量：
 
-| Variable | Description | Example |
+| 变量名 | 说明 | 示例 |
 | --- | --- | --- |
-| `JWT_SECRET` | Secret key used for JWT signing and verification (**Must be at least 32 characters**). | `your_super_secret_jwt_key_at_least_32_chars` |
-| `NAV_HOST` | Host URL used by server-side ISR data fetching (based on your environment or domain). | `http://localhost:8088` |
+| `JWT_SECRET` | 用于 JWT 签名与校验的密钥（**必须不少于 32 位字符**）。 | `your_super_secret_jwt_key_at_least_32_chars` |
+| `NAV_HOST` | 服务端 ISR 数据 Fetch 所需的主机路径（按绑定域名设定）。 | `http://localhost:8088` |
 
-## KV Data Model (`fkv`)
+## KV 数据结构 (`fkv`)
 
-All application data is stored in the bound Edge KV namespace variable `fkv`:
+项目所有持久化数据存储于 Edge KV 绑定变量 `fkv` 中：
 
-- `navigation:data:<username>`: Stores `{ version, menus, sites }`. Menus support a 2-level hierarchy; sites store `{ id, menuId, name, description, url, iconUrl }`.
-- `navigation:favorites:<username>`: Stores an array of favorited site URLs for the user.
-- `navigation:user:<username>`: Stores the user's SHA-256 password hash string.
+- `navigation:data:<username>`：存储 `{ version, menus, sites }` 数据。菜单支持最多 2 级树状结构；站点字段包含 `{ id, menuId, name, description, url, iconUrl }`。
+- `navigation:favorites:<username>`：存储用户的收藏网址 URL 数组。
+- `navigation:user:<username>`：存储用户密码的 SHA-256 哈希字符串。
 
-## Development & Deployment
+## 本地开发与构建
 
-### Local Development
+### 本地开发
 
 ```bash
 npm install
 edgeone pages dev
 ```
 
-### Production Build
+### 项目构建
 
 ```bash
 edgeone pages build

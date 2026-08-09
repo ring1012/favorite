@@ -2,7 +2,7 @@ import { headers } from 'next/headers'
 import { getSessionUser } from '@/lib/auth'
 import NavigationApp from '@/components/NavigationApp'
 
-export const revalidate = 60
+export const revalidate = 86400
 
 async function getISRData() {
   try {
@@ -15,7 +15,7 @@ async function getISRData() {
     const protocol = headersList.get('x-forwarded-proto') || 'http'
 
     // The query parameter ?username=... makes this URL unique per user,
-    // which serves as the cache key for Next.js Data Cache (revalidate: 60).
+    // which serves as the cache key for Next.js Data Cache (revalidate: 24 * 3600).
     // Note: Since we use cookies()/headers(), the HTML itself is dynamically 
     // rendered per request, but this fetch data is cached by URL.
     const url = `${protocol}://${host}/api/navigation?username=${encodeURIComponent(targetUser)}`
@@ -23,7 +23,7 @@ async function getISRData() {
     console.log(`[getISRData] Fetching ${url} for user: ${targetUser}`)
 
     const res = await fetch(url, {
-      next: { revalidate: 60 }
+      next: { revalidate: 24 * 3600 }
     })
 
     if (res.ok) {

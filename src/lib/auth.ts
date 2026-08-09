@@ -1,9 +1,8 @@
 import { cookies } from 'next/headers'
-import { jwtVerify } from 'jose'
 
 export interface SessionUser {
   username: string
-  payload?: any
+  payload?: Record<string, unknown>
 }
 
 /**
@@ -21,8 +20,8 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       const base64Url = parts[1]
       const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
       const jsonPayload = Buffer.from(base64, 'base64').toString('utf-8')
-      const payload = JSON.parse(jsonPayload)
-      if (payload?.sub) {
+      const payload = JSON.parse(jsonPayload) as Record<string, unknown>
+      if (typeof payload?.sub === 'string') {
         return { username: payload.sub, payload }
       }
     }

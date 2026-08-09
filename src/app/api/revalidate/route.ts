@@ -11,8 +11,9 @@ export async function POST(request: Request) {
     }
     revalidatePath('/')
     return NextResponse.json({ revalidated: true, user, now: Date.now() })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[revalidatePath] Error during revalidation:', error)
-    return NextResponse.json({ error: error?.message || 'Revalidation failed' }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Revalidation failed'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
