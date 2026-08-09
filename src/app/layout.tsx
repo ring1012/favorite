@@ -3,8 +3,8 @@ import "./globals.css";
 import NextTopLoader from 'nextjs-toploader';
 
 export const metadata: Metadata = {
-  title: "EdgeOne Pages Next.js 模板 - 服务端渲染与静态增量生成",
-  description: "使用 Next.js 在 EdgeOne Pages 上演示服务端渲染（SSR）与静态增量生成（ISR）。",
+  title: "Orbit - 个人网址导航与书签管理",
+  description: "简约高效的响应式个人网址导航与书签管理系统。",
 };
 
 export default function RootLayout({
@@ -15,7 +15,7 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" className="dark">
       <head>
-        <link rel="icon" href="/eo-logo-blue.svg" />
+        <link rel="icon" href="/orbit-logo.svg" type="image/svg+xml" />
       </head>
       <body className="bg-black text-white antialiased">
         <NextTopLoader 
