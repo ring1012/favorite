@@ -11,7 +11,8 @@ export async function onRequestGet({ request, env }) {
   const requested = (url.searchParams.get('username') || '').trim().toLowerCase()
   if (requested) {
     const navigation = await loadNavigation(requested)
-    return json({ owner: requested, authenticated: false, navigation: ensureLikeMenu(navigation), favorites: [] }, {
+    const favorites = await loadFavorites(requested)
+    return json({ owner: requested, authenticated: false, navigation: ensureLikeMenu(navigation), favorites }, {
       headers: { 'cache-control': 'public, max-age=60, s-maxage=60' },
     })
   }
@@ -30,6 +31,12 @@ export async function onRequestPost({ request, env }) {
     const result = await mutate(navigation, favorites, payload)
     await saveNavigation(user, navigation)
     await saveFavorites(user, favorites)
+
+    try {
+      const url = new URL(request.url)
+      fetch(`${url.origin}/api/revalidate?user=${encodeURIComponent(user)}`, { method: 'POST' }).catch(() => {})
+    } catch (e) {}
+
     return json({ owner: user, authenticated: true, navigation: ensureLikeMenu(navigation), favorites, result }, { headers: { 'cache-control': 'no-store' } })
   } catch (error) {
     return json({ error: error.message || '无法保存更改。' }, { status: 400 })

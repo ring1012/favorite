@@ -1,32 +1,42 @@
-# EdgeOne Pages Next.js SSR 与 ISR 模板
+# Orbit 网址导航 - EdgeOne Pages Next.js 模板
 
-一个专注于 SSR 和 ISR 渲染策略的 Next.js 15 / EdgeOne Pages 演示项目。
+基于 **Next.js 15** 与 **Tencent EdgeOne Pages** 打造的高性能现代网址导航系统。
 
-## 保留功能
+## 架构与缓存策略
 
-- **SSR**（`/ssr`）：每次请求都在服务端实时渲染。
-- **ISR**（`/isr`）：先生成静态页面，再按设定周期增量更新。
-- **Edge KV API**（`/hello-edge`）：通过 Edge Function 递增 KV 计数器。部署前请将 KV 命名空间以变量名 `fkv` 绑定到项目。
-- **导航页**（`/isr`）：ISR 缓存 60 秒；匿名用户读取 `admin` 导航，登录用户读取并编辑自己的导航。
+- **主页 (`/`)**：非缓存页面（动态渲染 Dynamic Rendering），每次请求实时响应。
+- **用户导航页 (`/nav/[user]`)**：标准的 ISR（增量静态生成）静态页面，缓存周期为 60 秒（`revalidate = 60`）。
+- **ISR 预加载数据接口**：由于 ISR 页面需要在服务端提前渲染加载用户数据且不依赖 Cookie，`GET /api/navigation?username=<username>` 接口未加 Cookie 强鉴权保护，可直接获取公开导航数据。
+- **编辑操作安全保护**：导航及分类的任何增删改操作（`POST /api/navigation`）均需经过 JWT Session Cookie（`navigation_session`）严格校验。
+- **ISR 缓存自动刷新**：用户在编辑保存导航时，后端会触发 `revalidatePath('/nav/' + user)` 立即清除对应 `/nav/[user]` 路径的 ISR 静态缓存。
 
-## KV 数据结构
+## 环境变量配置
 
-所有数据均存储在绑定变量 `fkv` 中：
+部署与运行需设置以下两个环境变量：
 
-- `navigation:data:<username>`：`{ version, menus, sites }`。菜单采用 `{ id, name, parentId }`，`parentId` 仅允许为空或指向一级菜单；站点采用 `{ id, menuId, name, description, url, iconUrl }`。
-- `navigation:user:<username>`：该用户密码的 SHA-256 hex 值。
-- `navigation:session:<token>`：用户名与过期时间；浏览器仅保存随机 token 的 HttpOnly Cookie（183 天）。
+| 变量名 | 说明 | 示例 |
+| --- | --- | --- |
+| `JWT_SECRET` | 用于 JWT 签名与校验的密钥（**必须不少于 32 位字符**）。 | `your_super_secret_jwt_key_at_least_32_chars` |
+| `NAV_HOST` | 服务端 ISR 数据 Fetch 所需的主机路径（按绑定域名设定）。 | `http://localhost:8088` |
 
-Edge Function API 包含 `/api/navigation`（读取与编辑）、`/api/auth/register`、`/api/auth/login` 和 `/api/auth/logout`。创建或修改站点 URL 时，函数会读取页面 HTML 的 `link[rel~="icon"]` 并保存图标 URL；相对路径会按站点 host 解析，绝对路径保持不变。
+## KV 数据结构 (`fkv`)
 
-## 本地开发
+项目所有持久化数据存储于 Edge KV 绑定变量 `fkv` 中：
+
+- `navigation:data:<username>`：存储 `{ version, menus, sites }` 数据。菜单支持最多 2 级树状结构；站点字段包含 `{ id, menuId, name, description, url, iconUrl }`。
+- `navigation:favorites:<username>`：存储用户的收藏网址 URL 数组。
+- `navigation:user:<username>`：存储用户密码的 SHA-256 哈希字符串。
+
+## 本地开发与构建
+
+### 本地开发
 
 ```bash
 npm install
 edgeone pages dev
 ```
 
-## 构建
+### 项目构建
 
 ```bash
 edgeone pages build

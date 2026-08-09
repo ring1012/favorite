@@ -106,17 +106,17 @@ export async function createSession(username, env) {
   const token = await new SignJWT({ sub: username })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('6M')
+    .setExpirationTime(Math.floor(Date.now() / 1000) + SIX_MONTHS_IN_SECONDS)
     .sign(jwtSecret(env))
   return token
 }
 
 export function sessionCookie(token) {
   // Deliberately works with the local HTTP development proxy as well as HTTPS production.
-  return `navigation_session=${encodeURIComponent(token)}; Path=/; Max-Age=${SIX_MONTHS_IN_SECONDS}; HttpOnly; SameSite=Lax`
+  return `navigation_session=${encodeURIComponent(token)}; Path=/; Max-Age=${SIX_MONTHS_IN_SECONDS}; SameSite=Lax`
 }
 
-export const expiredSessionCookie = 'navigation_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax'
+export const expiredSessionCookie = 'navigation_session=; Path=/; Max-Age=0; SameSite=Lax'
 
 export async function getUser(username) {
   const stored = await fkv.get(userKey(username))

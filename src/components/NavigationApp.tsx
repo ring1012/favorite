@@ -19,7 +19,7 @@ async function api(path: string, init?: RequestInit) {
   return data
 }
 
-export default function NavigationApp({ initialData }: { initialData?: Payload }) {
+export default function NavigationApp({ initialData, expectedUser }: { initialData?: Payload, expectedUser?: string }) {
   const [data, setData] = useState<Payload>(initialData || { owner: 'admin', authenticated: false, navigation: emptyNavigation, favorites: [] })
   const [activeMenu, setActiveMenu] = useState<string | null>(LIKE_MENU_ID)
   const [expanded, setExpanded] = useState<string[]>([])
@@ -35,6 +35,7 @@ export default function NavigationApp({ initialData }: { initialData?: Payload }
   const [editMode, setEditMode] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [pendingFavs, setPendingFavs] = useState<Set<string>>(new Set())
+  const [blockedByAuth, setBlockedByAuth] = useState(!!expectedUser)
   const loadMoreRef = useRef<HTMLDivElement>(null)
 
   const refresh = async () => {
@@ -53,14 +54,43 @@ export default function NavigationApp({ initialData }: { initialData?: Payload }
   }
 
   useEffect(() => {
-    // Check client-side cookie to ensure authenticated state is not lost due to SSR ISR caching
-    const hasSessionCookie = typeof document !== 'undefined' && document.cookie.includes('navigation_session=')
-    if (!initialData || (hasSessionCookie && !initialData.authenticated)) {
+    let loggedInUser = null
+    const match = typeof document !== 'undefined' && document.cookie.match(/navigation_session=([^;]+)/)
+    if (match) {
+      try {
+        const parts = decodeURIComponent(match[1]).split('.')
+        if (parts.length === 3) {
+          const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+          const payloadStr = decodeURIComponent(escape(window.atob(base64)))
+          loggedInUser = JSON.parse(payloadStr).sub
+        }
+      } catch (e) {
+        console.error('Failed to parse frontend cookie:', e)
+      }
+    }
+
+    if (expectedUser && expectedUser !== loggedInUser) {
+      setBlockedByAuth(true)
+      setAuthMode(true)
+      setLoading(false)
+      return
+    } else {
+      setBlockedByAuth(false)
+    }
+
+    if (!initialData) {
       refresh()
+    } else if (loggedInUser) {
+      if (initialData.owner === loggedInUser) {
+        setData((prev) => ({ ...prev, authenticated: true }))
+        setLoading(false)
+      } else {
+        refresh()
+      }
     } else {
       setLoading(false)
     }
-  }, [initialData])
+  }, [initialData, expectedUser])
 
   useEffect(() => {
     if (!data.authenticated) {
@@ -114,7 +144,6 @@ export default function NavigationApp({ initialData }: { initialData?: Payload }
       setNotice('已保存。')
       setMenuEditor(null)
       setSiteEditor(null)
-      fetch('/api/revalidate', { method: 'POST' }).catch(() => {})
     } catch (error) {
       setNotice(error instanceof Error ? error.message : '无法保存。')
     } finally {
@@ -159,6 +188,14 @@ export default function NavigationApp({ initialData }: { initialData?: Payload }
     } finally {
       setPendingFavs((prev) => { const next = new Set(prev); next.delete(site.url); return next })
     }
+  }
+
+  if (blockedByAuth) {
+    return (
+      <main className="min-h-screen bg-[#090b10] flex items-center justify-center font-sans">
+        {authMode && <AuthDialog onClose={() => {}} onDone={() => { setAuthMode(false); window.location.reload() }} />}
+      </main>
+    )
   }
 
   return (
