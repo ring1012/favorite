@@ -32,7 +32,7 @@ const DemoLayout = ({
         <p className="text-lg text-gray-400 mb-8">{description}</p>
         <a href="https://pages.edgeone.ai/document/framework-nextjs" target="_blank" rel="noopener noreferrer">
           <Button size="lg" variant="outline" className="hover:bg-gray-700 text-white px-8 py-3 text-lg cursor-pointer">
-            View Documentation
+            查看文档
           </Button>
         </a>
       </div>
@@ -48,7 +48,7 @@ const DemoLayout = ({
       <div className="container mx-auto px-4 mb-20">
         <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-lg p-8 text-center">
           <div className={`${modeStyles} border rounded-lg p-4 mb-6`}>
-            <p className="text-sm">This page uses the {renderMode} strategy.</p>
+            <p className="text-sm">此页面使用 {renderMode} 策略。</p>
           </div>
           {dataDisplay}
         </div>

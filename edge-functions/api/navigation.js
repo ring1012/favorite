@@ -1,40 +1,52 @@
-import { currentUser, id, json, loadNavigation, menuDepth, requireText, resolveIcon, saveNavigation } from '../_lib/navigation.js'
+import { currentUser, ensureLikeMenu, id, json, loadFavorites, loadNavigation, menuDepth, requireText, resolveIcon, saveFavorites, saveNavigation } from '../_lib/navigation.js'
 
-function responseFor(user, navigation) {
-  return json({ owner: user || 'admin', authenticated: Boolean(user), navigation }, {
-    headers: { 'cache-control': user ? 'private, no-store' : 'public, max-age=60, s-maxage=60' },
+function responseFor(user, navigation, favorites) {
+  return json({ owner: user || 'admin', authenticated: Boolean(user), navigation: ensureLikeMenu(navigation), favorites }, {
+    headers: { 'cache-control': 'private, no-store' },
   })
 }
 
-export async function onRequestGet({ request }) {
+export async function onRequestGet({ request, env }) {
   const url = new URL(request.url)
   const requested = (url.searchParams.get('username') || '').trim().toLowerCase()
   if (requested) {
-    return json({ owner: requested, authenticated: false, navigation: await loadNavigation(requested) }, {
+    const navigation = await loadNavigation(requested)
+    return json({ owner: requested, authenticated: false, navigation: ensureLikeMenu(navigation), favorites: [] }, {
       headers: { 'cache-control': 'public, max-age=60, s-maxage=60' },
     })
   }
-  const user = await currentUser(request)
-  return responseFor(user, await loadNavigation(user || 'admin'))
+  const user = await currentUser(request, env)
+  return responseFor(user, await loadNavigation(user || 'admin'), await loadFavorites(user))
 }
 
-export async function onRequestPost({ request }) {
-  const user = await currentUser(request)
-  if (!user) return json({ error: 'Sign in to edit this navigation.' }, { status: 401 })
+export async function onRequestPost({ request, env }) {
+  const user = await currentUser(request, env)
+  if (!user) return json({ error: '请先登录再编辑该导航。' }, { status: 401 })
 
   try {
     const payload = await request.json()
     const navigation = await loadNavigation(user)
-    const result = await mutate(navigation, payload)
+    const favorites = await loadFavorites(user)
+    const result = await mutate(navigation, favorites, payload)
     await saveNavigation(user, navigation)
-    return json({ owner: user, authenticated: true, navigation, result }, { headers: { 'cache-control': 'no-store' } })
+    await saveFavorites(user, favorites)
+    return json({ owner: user, authenticated: true, navigation: ensureLikeMenu(navigation), favorites, result }, { headers: { 'cache-control': 'no-store' } })
   } catch (error) {
-    return json({ error: error.message || 'Unable to save changes.' }, { status: 400 })
+    return json({ error: error.message || '无法保存更改。' }, { status: 400 })
   }
 }
 
-async function mutate(navigation, payload) {
+async function mutate(navigation, favorites, payload) {
   const action = payload?.action
+  if (action === 'add-favorite' || action === 'remove-favorite') {
+    const url = new URL(requireText(payload.url, 'Website URL', 2048)).toString()
+    if (!['http:', 'https:'].includes(new URL(url).protocol)) throw new Error('Website URL must use http or https.')
+    const index = favorites.indexOf(url)
+    if (action === 'add-favorite' && index === -1) favorites.push(url)
+    if (action === 'remove-favorite' && index !== -1) favorites.splice(index, 1)
+    return { url, favorited: action === 'add-favorite' }
+  }
+
   if (action === 'create-menu') {
     const parentId = payload.parentId || null
     if (parentId) {
@@ -76,7 +88,12 @@ async function mutate(navigation, payload) {
     site.name = requireText(payload.name, 'Website name', 80)
     site.description = requireText(payload.description, 'Website description', 280)
     site.url = url
-    if (action === 'create-site' || urlChanged) site.iconUrl = await resolveIcon(url)
+    const iconUrl = typeof payload.iconUrl === 'string' ? payload.iconUrl.trim() : ''
+    if (iconUrl) {
+      site.iconUrl = iconUrl
+    } else if (action === 'create-site' || urlChanged) {
+      site.iconUrl = await resolveIcon(url)
+    }
     if (action === 'create-site') navigation.sites.push(site)
     return site
   }

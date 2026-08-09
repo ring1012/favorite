@@ -1,3 +1,5 @@
+import { SignJWT, jwtVerify } from 'jose'
+
 const SIX_MONTHS_IN_SECONDS = 60 * 60 * 24 * 183
 
 export const emptyNavigation = () => ({
@@ -6,24 +8,36 @@ export const emptyNavigation = () => ({
   sites: [],
 })
 
+export const ensureLikeMenu = (navigation) => {
+  if (!navigation.menus.some((menu) => menu.id === 'like')) {
+    navigation.menus.push({ id: 'like', name: '收藏', parentId: null })
+  }
+  return navigation
+}
+
 const adminNavigation = () => ({
   version: 1,
   menus: [
-    { id: 'productivity', name: 'Productivity', parentId: null },
-    { id: 'developer', name: 'Developer', parentId: null },
-    { id: 'design', name: 'Design', parentId: null },
-    { id: 'notes', name: 'Notes', parentId: 'productivity' },
+    { id: 'productivity', name: '效率工具', parentId: null },
+    { id: 'developer', name: '开发者', parentId: null },
+    { id: 'design', name: '设计', parentId: null },
+    { id: 'notes', name: '笔记', parentId: 'productivity' },
   ],
   sites: [
-    { id: 'notion', menuId: 'notes', name: 'Notion', description: 'Connected workspace for notes, docs, and projects.', url: 'https://www.notion.so', iconUrl: 'https://www.notion.so/favicon.ico' },
-    { id: 'github', menuId: 'developer', name: 'GitHub', description: 'Build, collaborate, and ship software.', url: 'https://github.com', iconUrl: 'https://github.com/favicon.ico' },
-    { id: 'figma', menuId: 'design', name: 'Figma', description: 'The collaborative interface design tool.', url: 'https://www.figma.com', iconUrl: 'https://www.figma.com/favicon.ico' },
+    { id: 'notion', menuId: 'notes', name: 'Notion', description: '集笔记、文档、项目于一体的协作工作空间。', url: 'https://www.notion.so', iconUrl: 'https://www.notion.so/favicon.ico' },
+    { id: 'github', menuId: 'developer', name: 'GitHub', description: '构建、协作和交付软件的平台。', url: 'https://github.com', iconUrl: 'https://github.com/favicon.ico' },
+    { id: 'figma', menuId: 'design', name: 'Figma', description: '协作式界面设计工具。', url: 'https://www.figma.com', iconUrl: 'https://www.figma.com/favicon.ico' },
   ],
 })
 
 const dataKey = (username) => `navigation:data:${username}`
 const userKey = (username) => `navigation:user:${username}`
-const sessionKey = (token) => `navigation:session:${token}`
+
+const jwtSecret = (env) => {
+  const secret = env['JWT_SECRET']
+  if (!secret || secret.length < 32) throw new Error('JWT_SECRET must be at least 32 characters')
+  return new TextEncoder().encode(secret)
+}
 
 export function json(data, options = {}) {
   return new Response(JSON.stringify(data), {
@@ -55,6 +69,18 @@ export async function saveNavigation(username, navigation) {
   await fkv.put(dataKey(username), JSON.stringify(navigation))
 }
 
+const favoritesKey = (username) => `navigation:favorites:${username}`
+
+export async function loadFavorites(username) {
+  if (!username) return []
+  const stored = await fkv.get(favoritesKey(username))
+  return stored ? (typeof stored === 'string' ? JSON.parse(stored) : stored) : []
+}
+
+export async function saveFavorites(username, favorites) {
+  await fkv.put(favoritesKey(username), JSON.stringify(favorites))
+}
+
 export function id(prefix) {
   const bytes = new Uint8Array(8)
   crypto.getRandomValues(bytes)
@@ -66,25 +92,23 @@ export async function sha256(value) {
   return [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
-export async function currentUser(request) {
+export async function currentUser(request, env) {
   const token = parseCookies(request).navigation_session
   if (!token) return null
-  const stored = await fkv.get(sessionKey(token))
-  if (!stored) return null
-  const session = typeof stored === 'string' ? JSON.parse(stored) : stored
-  if (!session.expiresAt || Date.now() > session.expiresAt) {
-    await fkv.delete(sessionKey(token))
+  try {
+    const { payload } = await jwtVerify(token, jwtSecret(env))
+    return payload.sub || null
+  } catch {
     return null
   }
-  return session.username
 }
 
-export async function createSession(username) {
-  const token = id('session')
-  await fkv.put(sessionKey(token), JSON.stringify({
-    username,
-    expiresAt: Date.now() + SIX_MONTHS_IN_SECONDS * 1000,
-  }))
+export async function createSession(username, env) {
+  const token = await new SignJWT({ sub: username })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('6M')
+    .sign(jwtSecret(env))
   return token
 }
 
@@ -100,27 +124,24 @@ export async function getUser(username) {
   return stored ? String(stored).trim().toLowerCase() : null
 }
 
-export async function createUser(username, password) {
-  await fkv.put(userKey(username), await sha256(password))
-  await saveNavigation(username, emptyNavigation())
-}
+
 
 export function requireText(value, label, maxLength = 120) {
   const text = typeof value === 'string' ? value.trim() : ''
-  if (!text || text.length > maxLength) throw new Error(`${label} is required and must be at most ${maxLength} characters.`)
+  if (!text || text.length > maxLength) throw new Error(`${label}为必填项，且不能超过${maxLength}个字符。`)
   return text
 }
 
 export async function resolveIcon(url) {
   const target = new URL(url)
-  if (!['https:', 'http:'].includes(target.protocol)) throw new Error('Website URL must use http or https.')
+    if (!['https:', 'http:'].includes(target.protocol)) throw new Error('仅支持 https 和 http 链接。')
 
   try {
     const response = await fetch(target.toString(), { redirect: 'follow' })
     const html = await response.text()
-    const links = html.match(/<link\\b[^>]*>/gi) || []
-    const iconLink = links.find((link) => /\\brel=["'][^"']*\\b(icon|shortcut icon|apple-touch-icon)[^"']*["']/i.test(link))
-    const href = iconLink && iconLink.match(/\\bhref=["']([^"']+)["']/i)?.[1]
+    const links = html.match(/<link\b[^>]*>/gi) || []
+    const iconLink = links.find((link) => /\brel=["'][^"']*\b(icon|shortcut icon|apple-touch-icon)[^"']*["']/i.test(link))
+    const href = iconLink && iconLink.match(/\bhref=["']([^"']+)["']/i)?.[1]
     return href ? new URL(href, target).toString() : new URL('/favicon.ico', target).toString()
   } catch {
     return new URL('/favicon.ico', target).toString()
