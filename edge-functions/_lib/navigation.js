@@ -9,9 +9,8 @@ export const emptyNavigation = () => ({
 })
 
 export const ensureLikeMenu = (navigation) => {
-  if (!navigation.menus.some((menu) => menu.id === 'like')) {
-    navigation.menus.push({ id: 'like', name: '收藏', parentId: null })
-  }
+  const otherMenus = (navigation.menus || []).filter((menu) => menu.id !== 'like')
+  navigation.menus = [{ id: 'like', name: '收藏', parentId: null }, ...otherMenus]
   return navigation
 }
 
