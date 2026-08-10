@@ -10,8 +10,7 @@
 !.yarn/releases
 !.yarn/versions
 .idea
-.edgeone/**
-.edgeone/project.json
+
 # testing
 /coverage
 

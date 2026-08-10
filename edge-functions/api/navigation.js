@@ -112,5 +112,16 @@ async function mutate(navigation, favorites, payload) {
     return { deleted: payload.id }
   }
 
+  if (action === 'reorder-sites') {
+    const siteIds = Array.isArray(payload.siteIds) ? payload.siteIds : []
+    const ids = new Set(siteIds)
+    if (siteIds.length !== navigation.sites.length || navigation.sites.some((site) => !ids.has(site.id))) {
+      throw new Error('站点顺序数据无效。')
+    }
+    const position = new Map(siteIds.map((siteId, index) => [siteId, index]))
+    navigation.sites = [...navigation.sites].sort((a, b) => position.get(a.id) - position.get(b.id))
+    return { reordered: siteIds.length }
+  }
+
   throw new Error('Unsupported action.')
 }
