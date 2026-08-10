@@ -1,4 +1,4 @@
-import { cookies } from 'next/headers'
+import { headers } from 'next/headers'
 
 export interface SessionUser {
   username: string
@@ -6,13 +6,13 @@ export interface SessionUser {
 }
 
 /**
- * Common helper function to extract and decode session info from cookies.
- * Extracts username (sub) from `navigation_session` cookie.
+ * Helper to extract and decode session info from the `x-n-auth` request header
+ * (the JWT issued at login and stored client-side in localStorage).
  */
 export async function getSessionUser(): Promise<SessionUser | null> {
   try {
-    const cookieStore = await cookies()
-    const token = cookieStore.get('navigation_session')?.value
+    const headersList = await headers()
+    const token = headersList.get('x-n-auth')
     if (!token) return null
 
     const parts = token.split('.')

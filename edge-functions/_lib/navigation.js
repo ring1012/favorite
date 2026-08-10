@@ -48,13 +48,6 @@ export function json(data, options = {}) {
   })
 }
 
-export function parseCookies(request) {
-  return Object.fromEntries((request.headers.get('cookie') || '').split(';').map((part) => {
-    const [key, ...value] = part.trim().split('=')
-    return key ? [key, decodeURIComponent(value.join('='))] : []
-  }).filter((entry) => entry.length))
-}
-
 export async function loadNavigation(username) {
   const stored = await fkv.get(dataKey(username))
   if (stored) return typeof stored === 'string' ? JSON.parse(stored) : stored
@@ -92,7 +85,9 @@ export async function sha256(value) {
 }
 
 export async function currentUser(request, env) {
-  const token = parseCookies(request).navigation_session
+  // Session token is carried by the `x-n-auth` header (stored client-side in localStorage),
+  // not by a cookie. See NavigationApp api() on the frontend for the matching usage.
+  const token = (request.headers.get('x-n-auth') || '').trim()
   if (!token) return null
   try {
     const { payload } = await jwtVerify(token, jwtSecret(env))
@@ -110,13 +105,6 @@ export async function createSession(username, env) {
     .sign(jwtSecret(env))
   return token
 }
-
-export function sessionCookie(token) {
-  // Deliberately works with the local HTTP development proxy as well as HTTPS production.
-  return `navigation_session=${encodeURIComponent(token)}; Path=/; Max-Age=${SIX_MONTHS_IN_SECONDS}; SameSite=Lax`
-}
-
-export const expiredSessionCookie = 'navigation_session=; Path=/; Max-Age=0; SameSite=Lax'
 
 export async function getUser(username) {
   const stored = await fkv.get(userKey(username))

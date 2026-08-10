@@ -9,11 +9,29 @@ type Site = { id?: string; menuId: string; name: string; description: string; ur
 type Navigation = { version: number; menus: Menu[]; sites: Site[] }
 type Payload = { owner: string; authenticated: boolean; navigation: Navigation; favorites: string[] }
 
+// The session token lives in localStorage so the user stays logged in across browser restarts.
+// Every request carries it back to the server via the `x-n-auth` header.
+const AUTH_KEY = 'navigation_session'
+function getAuthToken() {
+  if (typeof window === 'undefined') return null
+  try { return window.localStorage.getItem(AUTH_KEY) } catch { return null }
+}
+function setAuthToken(token: string) {
+  try { window.localStorage.setItem(AUTH_KEY, token) } catch {}
+}
+function clearAuthToken() {
+  try { window.localStorage.removeItem(AUTH_KEY) } catch {}
+}
+
 const emptyNavigation: Navigation = { version: 1, menus: [{ id: LIKE_MENU_ID, name: '收藏', parentId: null }], sites: [] }
 const SITES_PER_PAGE = 24
 
 async function api(path: string, init?: RequestInit) {
-  const response = await fetch(path, { ...init, headers: { 'content-type': 'application/json', ...(init?.headers || {}) } })
+  const headers = new Headers(init?.headers)
+  headers.set('content-type', 'application/json')
+  const token = getAuthToken()
+  if (token) headers.set('x-n-auth', token)
+  const response = await fetch(path, { ...init, headers })
   const data = await response.json()
   if (!response.ok) throw new Error(data.error || '请求失败。')
   return data
@@ -54,18 +72,18 @@ export default function NavigationApp({ initialData, expectedUser }: { initialDa
   }
 
   useEffect(() => {
-    let loggedInUser = null
-    const match = typeof document !== 'undefined' && document.cookie.match(/navigation_session=([^;]+)/)
-    if (match) {
+    let loggedInUser: string | null = null
+    const token = getAuthToken()
+    if (token) {
       try {
-        const parts = decodeURIComponent(match[1]).split('.')
+        const parts = token.split('.')
         if (parts.length === 3) {
           const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
           const payloadStr = decodeURIComponent(escape(window.atob(base64)))
-          loggedInUser = JSON.parse(payloadStr).sub
+          loggedInUser = JSON.parse(payloadStr).sub as string
         }
       } catch (e) {
-        console.error('Failed to parse frontend cookie:', e)
+        console.error('Failed to parse local session token:', e)
       }
     }
 
@@ -244,7 +262,7 @@ export default function NavigationApp({ initialData, expectedUser }: { initialDa
             {data.authenticated ? (
               <>
                 <button onClick={() => setEditMode(!editMode)} title={editMode ? "退出编辑模式" : "进入编辑模式"} className={`icon-button ${editMode ? 'bg-blue-500/15 text-blue-300 hover:text-blue-200' : ''}`}><Pencil size={15} /></button>
-                <button onClick={async () => { await api('/api/auth/logout', { method: 'POST' }); setData({ owner: 'admin', authenticated: false, navigation: emptyNavigation, favorites: [] }); setEditMode(false); refresh() }} className="icon-button" title="退出登录"><LogOut size={15} /></button>
+                <button onClick={async () => { try { await api('/api/auth/logout', { method: 'POST' }) } catch {} finally { clearAuthToken(); setData({ owner: 'admin', authenticated: false, navigation: emptyNavigation, favorites: [] }); setEditMode(false); refresh() } }} className="icon-button" title="退出登录"><LogOut size={15} /></button>
               </>
             ) : (
               <button onClick={() => setAuthMode(true)} className="icon-button" title="登录"><LogIn size={15} /></button>
@@ -463,14 +481,14 @@ function SiteSection({ title, sites, favoriteUrls, pendingFavs, authenticated, e
                   className={isFav ? 'fill-rose-500 text-rose-500' : 'text-slate-300 hover:text-rose-400'}
                 />
               </button>
-              <a href={site.url} target="_blank" rel="noreferrer" className="block">
+              <a href={site.url} target="_blank" rel="noreferrer" title={site.description || undefined} className="block">
                 <div className="mb-2 flex items-center gap-2.5 pr-6">
                   <div className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-lg bg-white/10 shadow-[inset_0_1px_2px_rgba(0,0,0,.2)]">
                     <img src={site.iconUrl.startsWith('/') ? `/api/icon?url=${encodeURIComponent(site.iconUrl)}` : site.iconUrl} alt="" loading="lazy" className="h-full w-full object-contain p-[3px]" onError={(event) => { event.currentTarget.style.display = 'none' }} />
                   </div>
                   <h2 className="truncate text-[13px] font-semibold tracking-tight text-slate-50 group-hover:text-white">{site.name}</h2>
                 </div>
-                <p className="truncate text-xs leading-4 text-slate-500">{site.description || <span className="text-slate-600">—</span>}</p>
+                <p className="hidden truncate text-xs leading-4 text-slate-500 md:block">{site.description || <span className="text-slate-600">—</span>}</p>
                 <p className="mt-1 truncate text-[10px] text-slate-600">{new URL(site.url).host}</p>
               </a>
               {authenticated && editMode && (
@@ -489,6 +507,6 @@ function SiteSection({ title, sites, favoriteUrls, pendingFavs, authenticated, e
 
 function Dialog({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) { return <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4 backdrop-blur-md"><div className="w-full max-w-md rounded-2xl bg-[#14141d] p-6 shadow-[0_24px_80px_rgba(0,0,0,.6),inset_0_1px_0_rgba(255,255,255,.06)]"><div className="mb-5 flex items-center justify-between"><h2 className="text-lg font-semibold text-white">{title}</h2><button className="icon-button" onClick={onClose}><X size={18} /></button></div>{children}</div></div> }
 function Field({ label, ...props }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) { return <label className="block text-sm text-slate-300">{label}<input {...props} className="mt-1.5 w-full rounded-xl bg-white/[.05] px-3.5 py-2.5 text-sm outline-none ring-1 ring-inset ring-white/[.08] transition placeholder:text-slate-600 focus:ring-2 focus:ring-blue-400/50 disabled:opacity-50" /></label> }
-function AuthDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) { const [error, setError] = useState(''); const [loading, setLoading] = useState(false); const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (loading) return; setLoading(true); setError(''); const form = new FormData(event.currentTarget); try { await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ username: form.get('username'), password: form.get('password') }) }); onDone() } catch (error) { setError(error instanceof Error ? error.message : '无法继续。') } finally { setLoading(false) } }; return <Dialog title="欢迎回来" onClose={onClose}><form className="space-y-4" onSubmit={submit}><Field label="用户名" name="username" placeholder="例如：zhang_san" required disabled={loading} /><Field label="密码" type="password" name="password" placeholder="至少 8 个字符" minLength={8} required disabled={loading} />{error && <p className="text-sm text-rose-300">{error}</p>}<button className="button-primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed" type="submit" disabled={loading}>{loading ? '处理中...' : '登录'}</button></form></Dialog> }
+function AuthDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) { const [error, setError] = useState(''); const [loading, setLoading] = useState(false); const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (loading) return; setLoading(true); setError(''); const form = new FormData(event.currentTarget); try { const result = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ username: form.get('username'), password: form.get('password') }) }); if (result.token) setAuthToken(result.token); onDone() } catch (error) { setError(error instanceof Error ? error.message : '无法继续。') } finally { setLoading(false) } }; return <Dialog title="欢迎回来" onClose={onClose}><form className="space-y-4" onSubmit={submit}><Field label="用户名" name="username" placeholder="例如：zhang_san" required disabled={loading} /><Field label="密码" type="password" name="password" placeholder="至少 8 个字符" minLength={8} required disabled={loading} />{error && <p className="text-sm text-rose-300">{error}</p>}<button className="button-primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed" type="submit" disabled={loading}>{loading ? '处理中...' : '登录'}</button></form></Dialog> }
 function MenuDialog({ value, isSubmitting, onClose, onSave }: { value: { name: string }; isSubmitting?: boolean; onClose: () => void; onSave: (name: string) => void }) { const [name, setName] = useState(value.name); return <Dialog title={value.name ? '重命名分类' : '新建分类'} onClose={onClose}><form className="space-y-4" onSubmit={(event) => { event.preventDefault(); if (!isSubmitting) onSave(name) }}><Field label="分类名称" value={name} onChange={(event) => setName(event.target.value)} required autoFocus disabled={isSubmitting} /><button className="button-primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed" disabled={isSubmitting}>{isSubmitting ? '保存中...' : '保存分类'}</button></form></Dialog> }
 function SiteDialog({ value, menus, isSubmitting, onClose, onSave }: { value: Partial<Site>; menus: Menu[]; isSubmitting?: boolean; onClose: () => void; onSave: (site: Partial<Site>) => void }) { const [site, setSite] = useState(value); const update = (key: keyof Site, value: string) => setSite((current) => ({ ...current, [key]: value })); return <Dialog title={site.id ? '编辑网站' : '添加网站'} onClose={onClose}><form className="space-y-4" onSubmit={(event) => { event.preventDefault(); if (!isSubmitting) onSave(site) }}><Field label="名称" value={site.name || ''} onChange={(event) => update('name', event.target.value)} required disabled={isSubmitting} /><Field label="描述" value={site.description || ''} onChange={(event) => update('description', event.target.value)} required disabled={isSubmitting} /><Field label="网站链接" type="url" value={site.url || ''} onChange={(event) => update('url', event.target.value)} placeholder="https://example.com" required disabled={isSubmitting} /><Field label="图标链接 (可选，直接使用此 Icon)" type="url" value={site.iconUrl || ''} onChange={(event) => update('iconUrl', event.target.value)} placeholder="https://example.com/favicon.ico" disabled={isSubmitting} /><label className="block text-sm text-slate-300">所属分类<select value={site.menuId || ''} onChange={(event) => update('menuId', event.target.value)} disabled={isSubmitting} className="mt-1.5 w-full rounded-xl bg-white/[.05] px-3.5 py-2.5 text-sm outline-none ring-1 ring-inset ring-white/[.08] transition focus:ring-2 focus:ring-blue-400/50 disabled:opacity-50">{menus.filter((m) => m.id !== LIKE_MENU_ID).map((menu) => <option key={menu.id} value={menu.id}>{menu.parentId ? '↳ ' : ''}{menu.name}</option>)}</select></label><button className="button-primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed" disabled={isSubmitting}>{isSubmitting ? '保存中...' : '保存网站'}</button></form></Dialog> }

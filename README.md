@@ -6,8 +6,8 @@
 
 - **主页 (`/`)**：非缓存页面（动态渲染 Dynamic Rendering），每次请求实时响应。
 - **用户导航页 (`/nav/[user]`)**：标准的 ISR（增量静态生成）静态页面，缓存周期为 60 秒（`revalidate = 60`）。
-- **ISR 预加载数据接口**：由于 ISR 页面需要在服务端提前渲染加载用户数据且不依赖 Cookie，`GET /api/navigation?username=<username>` 接口未加 Cookie 强鉴权保护，可直接获取公开导航数据。
-- **编辑操作安全保护**：导航及分类的任何增删改操作（`POST /api/navigation`）均需经过 JWT Session Cookie（`navigation_session`）严格校验。
+- **ISR 预加载数据接口**：由于 ISR 页面需要在服务端提前渲染加载用户数据，`GET /api/navigation?username=<username>` 接口未加强鉴权保护，可直接获取公开导航数据。
+- **编辑操作安全保护**：导航及分类的任何增删改操作（`POST /api/navigation`）均需经过 JWT 会话令牌严格校验。登录成功后，前端将令牌保存在 **localStorage**（键 `navigation_session`），并通过统一的请求拦截层把令牌放入 `x-n-auth` 请求头提交给后端，后端仅校验该 Header，不再使用 Cookie。
 - **ISR 缓存自动刷新**：用户在编辑保存导航时，后端会触发 `revalidatePath('/nav/' + user)` 立即清除对应 `/nav/[user]` 路径的 ISR 静态缓存。
 
 ## 环境变量配置
