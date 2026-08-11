@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronRight,
   FolderPlus,
+  GripVertical,
   Heart,
   PanelLeftClose,
   PanelLeftOpen,
@@ -27,9 +28,14 @@ interface SidebarProps {
   authenticated: boolean
   editMode: boolean
   isSubmitting: boolean
+  menuDraggingId: string | null
+  setMenuDraggingId: (id: string | null) => void
+  menuDragOverId: string | null
+  setMenuDragOverId: (id: string | null) => void
   onAddMenu: (parentId: string | null) => void
   onEditMenu: (menu: { id: string; name: string }) => void
   onDeleteMenu: (id: string) => void
+  onReorderMenu: (sourceId: string, targetId: string) => void
 }
 
 export function Sidebar({
@@ -45,11 +51,68 @@ export function Sidebar({
   authenticated,
   editMode,
   isSubmitting,
+  menuDraggingId,
+  setMenuDraggingId,
+  menuDragOverId,
+  setMenuDragOverId,
   onAddMenu,
   onEditMenu,
   onDeleteMenu,
+  onReorderMenu,
 }: SidebarProps) {
   const roots = menus.filter((menu) => !menu.parentId)
+
+  const handleRootDragStart = (e: React.DragEvent, id: string) => {
+    setMenuDraggingId(id)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleRootDragOver = (e: React.DragEvent, id: string) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (id !== menuDraggingId) setMenuDragOverId(id)
+  }
+
+  const handleRootDrop = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault()
+    if (menuDraggingId && menuDraggingId !== targetId) {
+      // Only allow root-to-root reorder
+      const source = menus.find((m) => m.id === menuDraggingId)
+      const target = menus.find((m) => m.id === targetId)
+      if (source && target && !source.parentId && !target.parentId) {
+        onReorderMenu(menuDraggingId, targetId)
+      }
+    }
+    setMenuDraggingId(null)
+    setMenuDragOverId(null)
+  }
+
+  const handleChildDragStart = (e: React.DragEvent, id: string) => {
+    e.stopPropagation()
+    setMenuDraggingId(id)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleChildDragOver = (e: React.DragEvent, id: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = 'move'
+    if (id !== menuDraggingId) setMenuDragOverId(id)
+  }
+
+  const handleChildDrop = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (menuDraggingId && menuDraggingId !== targetId) {
+      const source = menus.find((m) => m.id === menuDraggingId)
+      const target = menus.find((m) => m.id === targetId)
+      if (source && target && source.parentId && source.parentId === target.parentId) {
+        onReorderMenu(menuDraggingId, targetId)
+      }
+    }
+    setMenuDraggingId(null)
+    setMenuDragOverId(null)
+  }
 
   return (
     <aside
@@ -90,12 +153,24 @@ export function Sidebar({
           const open = expanded.includes(root.id)
           const isRootActive = activeMenu === root.id
           const isLike = root.id === LIKE_MENU_ID
+          const isDraggingThis = menuDraggingId === root.id
+          const isDragOver = menuDragOverId === root.id
 
           return (
-            <div key={root.id} className="space-y-0.5">
+            <div
+              key={root.id}
+              className={`space-y-0.5 transition-opacity duration-150 ${isDraggingThis ? 'opacity-40' : 'opacity-100'}`}
+              draggable={editMode && !isLike}
+              onDragStart={editMode && !isLike ? (e) => handleRootDragStart(e, root.id) : undefined}
+              onDragOver={editMode && !isLike ? (e) => handleRootDragOver(e, root.id) : undefined}
+              onDrop={editMode && !isLike ? (e) => handleRootDrop(e, root.id) : undefined}
+              onDragEnd={() => { setMenuDraggingId(null); setMenuDragOverId(null) }}
+            >
               <div
                 className={`group relative flex items-center justify-between rounded-lg px-2 py-[7px] text-[13px] font-medium transition-all duration-200 cursor-pointer ${
-                  isRootActive
+                  isDragOver && !isDraggingThis
+                    ? 'ring-2 ring-blue-400/60 bg-blue-500/10'
+                    : isRootActive
                     ? 'bg-gradient-to-r from-blue-500/20 to-violet-500/10 text-blue-50 font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,.06)]'
                     : 'text-slate-400 hover:bg-white/[.05] hover:text-slate-100'
                 }`}
@@ -105,6 +180,15 @@ export function Sidebar({
                 }}
               >
                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                  {editMode && !isLike && (
+                    <span
+                      className="shrink-0 cursor-grab text-slate-600 hover:text-slate-400 active:cursor-grabbing"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <GripVertical size={12} />
+                    </span>
+                  )}
+
                   {children.length > 0 ? (
                     <button
                       type="button"
@@ -178,20 +262,41 @@ export function Sidebar({
                 <div className="ml-3.5 pl-2 space-y-0.5 mt-0.5">
                   {children.map((child) => {
                     const isChildActive = activeMenu === child.id
+                    const isChildDragging = menuDraggingId === child.id
+                    const isChildDragOver = menuDragOverId === child.id
                     return (
                       <div
                         key={child.id}
                         className={`group flex items-center justify-between rounded-lg px-2 py-[6px] text-[13px] transition-all cursor-pointer ${
-                          isChildActive
+                          isChildDragging
+                            ? 'opacity-40'
+                            : isChildDragOver
+                            ? 'ring-2 ring-blue-400/60 bg-blue-500/10'
+                            : isChildActive
                             ? 'bg-blue-500/[.14] font-semibold text-blue-50'
                             : 'text-slate-500 hover:bg-white/[.05] hover:text-slate-200'
                         }`}
+                        draggable={editMode}
+                        onDragStart={editMode ? (e) => handleChildDragStart(e, child.id) : undefined}
+                        onDragOver={editMode ? (e) => handleChildDragOver(e, child.id) : undefined}
+                        onDrop={editMode ? (e) => handleChildDrop(e, child.id) : undefined}
+                        onDragEnd={() => { setMenuDraggingId(null); setMenuDragOverId(null) }}
                         onClick={() => {
-                            setActiveMenu(child.id)
-                            onNavigate()
-                          }}
+                          setActiveMenu(child.id)
+                          onNavigate()
+                        }}
                       >
-                        <span className="truncate flex-1">{child.name}</span>
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          {editMode && (
+                            <span
+                              className="shrink-0 cursor-grab text-slate-600 hover:text-slate-400 active:cursor-grabbing"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <GripVertical size={12} />
+                            </span>
+                          )}
+                          <span className="truncate flex-1">{child.name}</span>
+                        </div>
                         {authenticated && editMode && (
                           <div className="hidden items-center gap-1 pr-1 group-hover:flex">
                             <button

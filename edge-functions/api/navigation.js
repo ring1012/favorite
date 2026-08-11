@@ -125,13 +125,40 @@ async function mutate(navigation, favorites, payload) {
 
   if (action === 'reorder-menus') {
     const menuIds = Array.isArray(payload.menuIds) ? payload.menuIds : []
-    const ids = new Set(menuIds)
-    if (menuIds.length !== navigation.menus.length || navigation.menus.some((menu) => !ids.has(menu.id))) {
+    // Filter out the virtual 'like' menu – it is not stored, only injected on read
+    const storedIds = new Set(navigation.menus.map((m) => m.id))
+    const filteredIds = menuIds.filter((id) => storedIds.has(id))
+    if (filteredIds.length !== navigation.menus.length || navigation.menus.some((menu) => !filteredIds.includes(menu.id))) {
       throw new Error('菜单顺序数据无效。')
     }
-    const position = new Map(menuIds.map((menuId, index) => [menuId, index]))
+    const position = new Map(filteredIds.map((menuId, index) => [menuId, index]))
     navigation.menus = [...navigation.menus].sort((a, b) => position.get(a.id) - position.get(b.id))
-    return { reordered: menuIds.length }
+    return { reordered: filteredIds.length }
+  }
+
+  if (action === 'move-menu') {
+    // Move a menu to a new parent (or to root if newParentId is null)
+    const menu = navigation.menus.find((m) => m.id === payload.id)
+    if (!menu) throw new Error('Menu not found.')
+    if (menu.id === 'like') throw new Error('"收藏"分类不能移动。')
+    const newParentId = payload.newParentId || null
+    if (newParentId) {
+      const newParent = navigation.menus.find((m) => m.id === newParentId)
+      if (!newParent) throw new Error('Target parent menu not found.')
+      if (newParent.parentId) throw new Error('A menu can contain only one child level.')
+      // Ensure the moving menu has no children (only leaves can be re-parented to another root)
+      const hasChildren = navigation.menus.some((m) => m.parentId === menu.id)
+      if (hasChildren) throw new Error('含有子分类的菜单不能移动到其他菜单下。')
+    }
+    menu.parentId = newParentId
+    // Optionally reorder after the move using insertAfterId
+    if (payload.insertAfterId !== undefined) {
+      const insertAfterId = payload.insertAfterId || null
+      const others = navigation.menus.filter((m) => m.id !== menu.id)
+      const insertIdx = insertAfterId ? others.findIndex((m) => m.id === insertAfterId) + 1 : 0
+      navigation.menus = [...others.slice(0, insertIdx), menu, ...others.slice(insertIdx)]
+    }
+    return menu
   }
 
   throw new Error('Unsupported action.')

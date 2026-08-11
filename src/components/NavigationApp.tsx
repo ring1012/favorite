@@ -47,6 +47,10 @@ export default function NavigationApp({
     setDraggingId,
     dragOverId,
     setDragOverId,
+    menuDraggingId,
+    setMenuDraggingId,
+    menuDragOverId,
+    setMenuDragOverId,
     menus,
     normalizedQuery,
     favoriteUrls,
@@ -56,6 +60,7 @@ export default function NavigationApp({
     loadMoreRef,
     handleForceRefresh,
     reorderSite,
+    reorderMenu,
     refresh,
     mutate,
     deleteItem,
@@ -134,9 +139,14 @@ export default function NavigationApp({
             authenticated={data.authenticated}
             editMode={editMode}
             isSubmitting={isSubmitting}
+            menuDraggingId={menuDraggingId}
+            setMenuDraggingId={setMenuDraggingId}
+            menuDragOverId={menuDragOverId}
+            setMenuDragOverId={setMenuDragOverId}
             onAddMenu={(parentId) => setMenuEditor({ name: '', parentId })}
             onEditMenu={(menu) => setMenuEditor(menu)}
             onDeleteMenu={(id) => deleteItem('menu', id)}
+            onReorderMenu={reorderMenu}
           />
 
           {/* Main Content Component */}

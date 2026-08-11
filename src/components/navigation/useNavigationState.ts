@@ -38,6 +38,8 @@ export function useNavigationState(initialData?: Payload, expectedUser?: string)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
   const reorderingRef = useRef(false)
   const nextOrderRef = useRef<Site[] | null>(null)
+  const [menuDraggingId, setMenuDraggingId] = useState<string | null>(null)
+  const [menuDragOverId, setMenuDragOverId] = useState<string | null>(null)
 
   const scheduleCacheRefresh = useCallback(() => {
     if (cacheRefreshTimer.current) clearTimeout(cacheRefreshTimer.current)
@@ -84,6 +86,68 @@ export function useNavigationState(initialData?: Payload, expectedUser?: string)
       if (nextOrderRef.current) flushReorder()
     }
   }, [scheduleCacheRefresh])
+
+  const reorderMenu = useCallback(
+    async (sourceId: string, targetId: string) => {
+      if (sourceId === targetId) return
+      const menus = data.navigation.menus
+      const source = menus.find((m) => m.id === sourceId)
+      const target = menus.find((m) => m.id === targetId)
+      if (!source || !target) return
+      // Both must be at the same level (both root or same parent)
+      if (source.parentId !== target.parentId) return
+
+      let newMenus: typeof menus
+      if (!source.parentId) {
+        // Root-level: move source group (root + its children) before/after target group
+        const buildGroup = (rootId: string) => [
+          menus.find((m) => m.id === rootId)!,
+          ...menus.filter((m) => m.parentId === rootId),
+        ]
+        const roots = menus.filter((m) => !m.parentId)
+        const fromIdx = roots.findIndex((m) => m.id === sourceId)
+        const toIdx = roots.findIndex((m) => m.id === targetId)
+        const reorderedRoots = [...roots]
+        const [moved] = reorderedRoots.splice(fromIdx, 1)
+        reorderedRoots.splice(toIdx, 0, moved)
+        newMenus = reorderedRoots.flatMap((root) => buildGroup(root.id))
+      } else {
+        // Child-level: reorder within the same parent
+        const parentId = source.parentId
+        const siblings = menus.filter((m) => m.parentId === parentId)
+        const fromIdx = siblings.findIndex((m) => m.id === sourceId)
+        const toIdx = siblings.findIndex((m) => m.id === targetId)
+        const reorderedSiblings = [...siblings]
+        const [moved] = reorderedSiblings.splice(fromIdx, 1)
+        reorderedSiblings.splice(toIdx, 0, moved)
+        // Rebuild full menus: roots interleaved with their (possibly reordered) children
+        const allRoots = menus.filter((m) => !m.parentId)
+        newMenus = allRoots.flatMap((root) => [
+          root,
+          ...(root.id === parentId
+            ? reorderedSiblings
+            : menus.filter((m) => m.parentId === root.id)),
+        ])
+      }
+
+      setData((prev) => ({ ...prev, navigation: { ...prev.navigation, menus: newMenus } }))
+      try {
+        const result = (await api('/api/navigation', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'reorder-menus', menuIds: newMenus.map((m) => m.id) }),
+        })) as Payload
+        const otherMenus = (result.navigation.menus || []).filter((m) => m.id !== LIKE_MENU_ID)
+        result.navigation.menus = [{ id: LIKE_MENU_ID, name: '收藏', parentId: null }, ...otherMenus]
+        setData(result)
+        scheduleCacheRefresh()
+      } catch (error) {
+        setNotice(error instanceof Error ? error.message : '无法保存菜单顺序。')
+        // Rollback
+        setData((prev) => ({ ...prev, navigation: { ...prev.navigation, menus } }))
+      }
+    },
+    [data.navigation.menus, scheduleCacheRefresh]
+  )
 
   const reorderSite = (sourceId: string, targetId: string) => {
     if (sourceId === targetId) return
@@ -350,6 +414,10 @@ export function useNavigationState(initialData?: Payload, expectedUser?: string)
     setDraggingId,
     dragOverId,
     setDragOverId,
+    menuDraggingId,
+    setMenuDraggingId,
+    menuDragOverId,
+    setMenuDragOverId,
     menus,
     normalizedQuery,
     favoriteUrls,
@@ -359,6 +427,7 @@ export function useNavigationState(initialData?: Payload, expectedUser?: string)
     loadMoreRef,
     handleForceRefresh,
     reorderSite,
+    reorderMenu,
     refresh,
     mutate,
     deleteItem,

@@ -46,6 +46,13 @@ export function NavigationHeader({
             {authenticated ? `${ownerName} 的网站导航` : '精选网址导航'}
           </p>
         </div>
+        <button
+          onClick={() => setMobileNavOpen(!mobileNavOpen)}
+          title={mobileNavOpen ? '收起分类' : '展开分类'}
+          className="icon-button lg:hidden"
+        >
+          {mobileNavOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
+        </button>
       </div>
 
       <form
@@ -77,13 +84,6 @@ export function NavigationHeader({
       </form>
 
       <div className="flex items-center gap-2">
-        <button
-          onClick={() => setMobileNavOpen(!mobileNavOpen)}
-          title={mobileNavOpen ? '收起分类' : '展开分类'}
-          className="icon-button lg:hidden"
-        >
-          {mobileNavOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
-        </button>
 
         <button
           onClick={onForceRefresh}
