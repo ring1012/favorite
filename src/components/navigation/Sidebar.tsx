@@ -22,6 +22,8 @@ interface SidebarProps {
   setExpanded: React.Dispatch<React.SetStateAction<string[]>>
   sidebarCollapsed: boolean
   setSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>
+  mobileNavOpen: boolean
+  onNavigate: () => void
   authenticated: boolean
   editMode: boolean
   isSubmitting: boolean
@@ -38,6 +40,8 @@ export function Sidebar({
   setExpanded,
   sidebarCollapsed,
   setSidebarCollapsed,
+  mobileNavOpen,
+  onNavigate,
   authenticated,
   editMode,
   isSubmitting,
@@ -49,8 +53,12 @@ export function Sidebar({
 
   return (
     <aside
-      className={`w-full shrink-0 rounded-2xl bg-white/[.03] p-2.5 shadow-[0_12px_40px_rgba(0,0,0,.3),inset_0_1px_0_rgba(255,255,255,.04)] backdrop-blur-sm transition-all duration-300 ${
-        sidebarCollapsed ? 'hidden lg:block lg:w-0 lg:overflow-hidden lg:p-0' : 'lg:w-52'
+      className={`shrink-0 rounded-2xl p-2.5 shadow-[0_12px_40px_rgba(0,0,0,.3),inset_0_1px_0_rgba(255,255,255,.04)] backdrop-blur-sm transition-all duration-300 ${
+        mobileNavOpen
+          ? 'fixed inset-y-0 left-0 z-40 w-64 max-w-[80vw] overflow-y-auto rounded-none bg-[#15151e]/95'
+          : 'hidden'
+      } lg:static lg:z-auto lg:block ${
+        sidebarCollapsed ? 'lg:w-0 lg:overflow-hidden lg:p-0' : 'lg:w-52 lg:max-w-none lg:overflow-visible lg:rounded-2xl lg:bg-white/[.03]'
       }`}
     >
       <div className="mb-2 flex items-center justify-between px-1">
@@ -58,7 +66,7 @@ export function Sidebar({
           <button
             title={sidebarCollapsed ? '展开分类' : '收起分类'}
             onClick={() => setSidebarCollapsed((value) => !value)}
-            className="icon-button p-1 text-slate-400 hover:text-slate-200"
+            className="icon-button hidden p-1 text-slate-400 hover:text-slate-200 lg:inline-grid"
           >
             {sidebarCollapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
           </button>
@@ -91,7 +99,10 @@ export function Sidebar({
                     ? 'bg-gradient-to-r from-blue-500/20 to-violet-500/10 text-blue-50 font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,.06)]'
                     : 'text-slate-400 hover:bg-white/[.05] hover:text-slate-100'
                 }`}
-                onClick={() => setActiveMenu(root.id)}
+                onClick={() => {
+                  setActiveMenu(root.id)
+                  onNavigate()
+                }}
               >
                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
                   {children.length > 0 ? (
@@ -175,7 +186,10 @@ export function Sidebar({
                             ? 'bg-blue-500/[.14] font-semibold text-blue-50'
                             : 'text-slate-500 hover:bg-white/[.05] hover:text-slate-200'
                         }`}
-                        onClick={() => setActiveMenu(child.id)}
+                        onClick={() => {
+                            setActiveMenu(child.id)
+                            onNavigate()
+                          }}
                       >
                         <span className="truncate flex-1">{child.name}</span>
                         {authenticated && editMode && (

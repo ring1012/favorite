@@ -37,6 +37,8 @@ export default function NavigationApp({
     setSearchQuery,
     sidebarCollapsed,
     setSidebarCollapsed,
+    mobileNavOpen,
+    setMobileNavOpen,
     editMode,
     setEditMode,
     isSubmitting,
@@ -101,10 +103,20 @@ export default function NavigationApp({
           setSearchScope={setSearchScope}
           editMode={editMode}
           setEditMode={setEditMode}
+          mobileNavOpen={mobileNavOpen}
+          setMobileNavOpen={setMobileNavOpen}
           onForceRefresh={handleForceRefresh}
           onLogout={handleLogout}
           onOpenAuth={() => setAuthMode(true)}
         />
+
+        {/* Mobile drawer backdrop */}
+        {mobileNavOpen && (
+          <div
+            className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden"
+            onClick={() => setMobileNavOpen(false)}
+          />
+        )}
 
         {/* Main Body Area */}
         <div className="flex flex-1 flex-col gap-3 lg:flex-row">
@@ -117,6 +129,8 @@ export default function NavigationApp({
             setExpanded={setExpanded}
             sidebarCollapsed={sidebarCollapsed}
             setSidebarCollapsed={setSidebarCollapsed}
+            mobileNavOpen={mobileNavOpen}
+            onNavigate={() => setMobileNavOpen(false)}
             authenticated={data.authenticated}
             editMode={editMode}
             isSubmitting={isSubmitting}

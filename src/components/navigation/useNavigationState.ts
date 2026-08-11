@@ -27,6 +27,7 @@ export function useNavigationState(initialData?: Payload, expectedUser?: string)
   const [searchScope, setSearchScope] = useState<'site' | 'google'>('site')
   const [searchQuery, setSearchQuery] = useState('')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [pendingFavs, setPendingFavs] = useState<Set<string>>(new Set())
@@ -338,6 +339,8 @@ export function useNavigationState(initialData?: Payload, expectedUser?: string)
     setSearchQuery,
     sidebarCollapsed,
     setSidebarCollapsed,
+    mobileNavOpen,
+    setMobileNavOpen,
     editMode,
     setEditMode,
     isSubmitting,

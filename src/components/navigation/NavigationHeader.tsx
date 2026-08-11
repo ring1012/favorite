@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { LogIn, LogOut, Pencil, RotateCw, Search } from 'lucide-react'
+import { LogIn, LogOut, PanelLeftClose, PanelLeftOpen, Pencil, RotateCw, Search } from 'lucide-react'
 
 interface NavigationHeaderProps {
   ownerName: string
@@ -12,6 +12,8 @@ interface NavigationHeaderProps {
   setSearchScope: (scope: 'site' | 'google') => void
   editMode: boolean
   setEditMode: (mode: boolean) => void
+  mobileNavOpen: boolean
+  setMobileNavOpen: (open: boolean) => void
   onForceRefresh: () => void
   onLogout: () => void
   onOpenAuth: () => void
@@ -26,6 +28,8 @@ export function NavigationHeader({
   setSearchScope,
   editMode,
   setEditMode,
+  mobileNavOpen,
+  setMobileNavOpen,
   onForceRefresh,
   onLogout,
   onOpenAuth,
@@ -73,6 +77,14 @@ export function NavigationHeader({
       </form>
 
       <div className="flex items-center gap-2">
+        <button
+          onClick={() => setMobileNavOpen(!mobileNavOpen)}
+          title={mobileNavOpen ? '收起分类' : '展开分类'}
+          className="icon-button lg:hidden"
+        >
+          {mobileNavOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
+        </button>
+
         <button
           onClick={onForceRefresh}
           className="icon-button"

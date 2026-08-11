@@ -123,5 +123,16 @@ async function mutate(navigation, favorites, payload) {
     return { reordered: siteIds.length }
   }
 
+  if (action === 'reorder-menus') {
+    const menuIds = Array.isArray(payload.menuIds) ? payload.menuIds : []
+    const ids = new Set(menuIds)
+    if (menuIds.length !== navigation.menus.length || navigation.menus.some((menu) => !ids.has(menu.id))) {
+      throw new Error('菜单顺序数据无效。')
+    }
+    const position = new Map(menuIds.map((menuId, index) => [menuId, index]))
+    navigation.menus = [...navigation.menus].sort((a, b) => position.get(a.id) - position.get(b.id))
+    return { reordered: menuIds.length }
+  }
+
   throw new Error('Unsupported action.')
 }
