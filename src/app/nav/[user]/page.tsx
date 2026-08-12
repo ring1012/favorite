@@ -14,7 +14,7 @@ async function getISRData(user: string) {
     console.log(`[getISRData] (ISR) Fetching ${url} for user: ${targetUser}`)
 
     const res = await fetch(url, {
-      cache: 'no-store'
+      next: { revalidate: revalidate }
     })
 
     if (res.ok) {

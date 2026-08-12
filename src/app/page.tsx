@@ -2,7 +2,7 @@ import { headers } from 'next/headers'
 import { getSessionUser } from '@/lib/auth'
 import NavigationApp from '@/components/NavigationApp'
 
-export const revalidate = 86400
+export const revalidate = 10800
 
 async function getISRData() {
   try {
@@ -23,7 +23,7 @@ async function getISRData() {
     console.log(`[getISRData] Fetching ${url} for user: ${targetUser}`)
 
     const res = await fetch(url, {
-      cache: 'no-store'
+      next: { revalidate: revalidate }
     })
 
     if (res.ok) {

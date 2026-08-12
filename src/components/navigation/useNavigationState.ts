@@ -412,7 +412,7 @@ export function useNavigationState(initialData?: Payload, expectedUser?: string)
   }
 
   const toggleFavorite = async (site: Site) => {
-    if (pendingFavs.has(site.url)) return
+    if (pendingFavs.size > 0 || pendingFavs.has(site.url)) return
     setPendingFavs((prev) => new Set(prev).add(site.url))
 
     const favorited = favoriteUrls.has(site.url)
