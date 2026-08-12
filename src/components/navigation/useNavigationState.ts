@@ -48,7 +48,7 @@ export function useNavigationState(initialData?: Payload, expectedUser?: string)
       cacheRefreshTimer.current = null
       if (!window.location.pathname.startsWith('/nav/')) return
       fetch(window.location.href, { cache: 'reload' }).catch(() => {})
-    }, 10000)
+    }, 300)
   }, [])
 
   const handleForceRefresh = useCallback(() => {
