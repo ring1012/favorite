@@ -1,6 +1,6 @@
 import NavigationApp from '@/components/NavigationApp'
 
-export const revalidate = 60
+export const revalidate = 10800
 
 async function getISRData(user: string) {
   try {
@@ -14,7 +14,7 @@ async function getISRData(user: string) {
     console.log(`[getISRData] (ISR) Fetching ${url} for user: ${targetUser}`)
 
     const res = await fetch(url, {
-      next: { revalidate: 60 }
+      cache: 'no-store'
     })
 
     if (res.ok) {

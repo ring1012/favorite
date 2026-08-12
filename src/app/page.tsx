@@ -23,7 +23,7 @@ async function getISRData() {
     console.log(`[getISRData] Fetching ${url} for user: ${targetUser}`)
 
     const res = await fetch(url, {
-      next: { revalidate: 24 * 3600 }
+      cache: 'no-store'
     })
 
     if (res.ok) {
