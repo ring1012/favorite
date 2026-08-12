@@ -1,23 +1,25 @@
 import { currentUser, ensureLikeMenu, id, json, loadFavorites, loadNavigation, menuDepth, requireText, resolveIcon, saveFavorites, saveNavigation } from '../_lib/navigation.js'
 
-function responseFor(user, navigation, favorites) {
-  return json({ owner: user || 'admin', authenticated: Boolean(user), navigation: ensureLikeMenu(navigation), favorites }, {
+function responseFor(user, navigation, favorites, env) {
+  const allowRegister = env['ALLOW_REG'] !== 'false'
+  return json({ owner: user || 'admin', authenticated: Boolean(user), navigation: ensureLikeMenu(navigation), favorites, allowRegister }, {
     headers: { 'cache-control': 'private, no-store' },
   })
 }
 
 export async function onRequestGet({ request, env }) {
+  const allowRegister = env['ALLOW_REG'] !== 'false'
   const url = new URL(request.url)
   const requested = (url.searchParams.get('username') || '').trim().toLowerCase()
   if (requested) {
     const navigation = await loadNavigation(requested)
     const favorites = await loadFavorites(requested)
-    return json({ owner: requested, authenticated: false, navigation: ensureLikeMenu(navigation), favorites }, {
+    return json({ owner: requested, authenticated: false, navigation: ensureLikeMenu(navigation), favorites, allowRegister }, {
       headers: { 'cache-control': 'public, max-age=60, s-maxage=60' },
     })
   }
   const user = await currentUser(request, env)
-  return responseFor(user, await loadNavigation(user || 'admin'), await loadFavorites(user))
+  return responseFor(user, await loadNavigation(user || 'admin'), await loadFavorites(user), env)
 }
 
 export async function onRequestPost({ request, env }) {
@@ -37,7 +39,8 @@ export async function onRequestPost({ request, env }) {
       fetch(`${url.origin}/api/revalidate?user=${encodeURIComponent(user)}`, { method: 'POST' }).catch(() => {})
     } catch (e) {}
 
-    return json({ owner: user, authenticated: true, navigation: ensureLikeMenu(navigation), favorites, result }, { headers: { 'cache-control': 'no-store' } })
+    const allowRegister = env['ALLOW_REG'] !== 'false'
+    return json({ owner: user, authenticated: true, navigation: ensureLikeMenu(navigation), favorites, result, allowRegister }, { headers: { 'cache-control': 'no-store' } })
   } catch (error) {
     return json({ error: error.message || '无法保存更改。' }, { status: 400 })
   }

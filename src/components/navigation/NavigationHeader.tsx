@@ -1,7 +1,5 @@
-'use client'
-
 import React from 'react'
-import { LogIn, LogOut, PanelLeftClose, PanelLeftOpen, Pencil, RotateCw, Search } from 'lucide-react'
+import { LogIn, LogOut, PanelLeftClose, PanelLeftOpen, Pencil, RotateCw, Search, UserPlus } from 'lucide-react'
 
 interface NavigationHeaderProps {
   ownerName: string
@@ -17,6 +15,8 @@ interface NavigationHeaderProps {
   onForceRefresh: () => void
   onLogout: () => void
   onOpenAuth: () => void
+  allowRegister?: boolean
+  onOpenRegister: () => void
 }
 
 export function NavigationHeader({
@@ -33,6 +33,8 @@ export function NavigationHeader({
   onForceRefresh,
   onLogout,
   onOpenAuth,
+  allowRegister,
+  onOpenRegister,
 }: NavigationHeaderProps) {
   return (
     <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-2xl bg-[#16161f]/75 px-4 py-3 shadow-[0_10px_40px_rgba(0,0,0,.4),inset_0_1px_0_rgba(255,255,255,.05)] backdrop-blur-xl md:flex-nowrap">
@@ -107,9 +109,16 @@ export function NavigationHeader({
             </button>
           </>
         ) : (
-          <button onClick={onOpenAuth} className="icon-button" title="登录">
-            <LogIn size={15} />
-          </button>
+          <div className="flex items-center gap-1.5">
+            {allowRegister && (
+              <button onClick={onOpenRegister} className="icon-button" title="注册">
+                <UserPlus size={15} />
+              </button>
+            )}
+            <button onClick={onOpenAuth} className="icon-button" title="登录">
+              <LogIn size={15} />
+            </button>
+          </div>
         )}
       </div>
     </header>

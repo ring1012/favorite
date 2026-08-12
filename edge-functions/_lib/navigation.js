@@ -111,6 +111,10 @@ export async function getUser(username) {
   return stored ? String(stored).trim().toLowerCase() : null
 }
 
+export async function saveUser(username, passwordHash) {
+  await fkv.put(userKey(username), passwordHash)
+}
+
 
 
 export function requireText(value, label, maxLength = 120) {

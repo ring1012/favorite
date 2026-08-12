@@ -7,7 +7,7 @@ import { useNavigationState } from './navigation/useNavigationState'
 import { NavigationHeader } from './navigation/NavigationHeader'
 import { Sidebar } from './navigation/Sidebar'
 import { MainContent } from './navigation/MainContent'
-import { AuthDialog, MenuDialog, SiteDialog } from './navigation/Dialogs'
+import { AuthDialog, MenuDialog, RegisterDialog, SiteDialog } from './navigation/Dialogs'
 
 export default function NavigationApp({
   initialData,
@@ -27,6 +27,8 @@ export default function NavigationApp({
     setNotice,
     authMode,
     setAuthMode,
+    registerMode,
+    setRegisterMode,
     menuEditor,
     setMenuEditor,
     siteEditor,
@@ -114,6 +116,8 @@ export default function NavigationApp({
           onForceRefresh={handleForceRefresh}
           onLogout={handleLogout}
           onOpenAuth={() => setAuthMode(true)}
+          allowRegister={data.allowRegister !== false}
+          onOpenRegister={() => setRegisterMode(true)}
         />
 
         {/* Mobile drawer backdrop */}
@@ -197,6 +201,19 @@ export default function NavigationApp({
           onClose={() => setAuthMode(false)}
           onDone={(username) => {
             setAuthMode(false)
+            if (username) {
+              window.location.assign(`/nav/${encodeURIComponent(username)}`)
+            } else {
+              refresh()
+            }
+          }}
+        />
+      )}
+      {registerMode && (
+        <RegisterDialog
+          onClose={() => setRegisterMode(false)}
+          onDone={(username) => {
+            setRegisterMode(false)
             if (username) {
               window.location.assign(`/nav/${encodeURIComponent(username)}`)
             } else {

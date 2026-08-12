@@ -21,6 +21,7 @@ export function useNavigationState(initialData?: Payload, expectedUser?: string)
   const [loading, setLoading] = useState(!initialData)
   const [notice, setNotice] = useState('')
   const [authMode, setAuthMode] = useState<boolean>(false)
+  const [registerMode, setRegisterMode] = useState<boolean>(false)
   const [menuEditor, setMenuEditor] = useState<{ id?: string; parentId?: string | null; name: string } | null>(null)
   const [siteEditor, setSiteEditor] = useState<Partial<Site> | null>(null)
   const [visibleCount, setVisibleCount] = useState(SITES_PER_PAGE)
@@ -472,6 +473,8 @@ export function useNavigationState(initialData?: Payload, expectedUser?: string)
     setNotice,
     authMode,
     setAuthMode,
+    registerMode,
+    setRegisterMode,
     menuEditor,
     setMenuEditor,
     siteEditor,

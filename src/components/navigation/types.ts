@@ -3,7 +3,7 @@ export const LIKE_MENU_ID = 'like'
 export type Menu = { id: string; name: string; parentId: string | null }
 export type Site = { id?: string; menuId: string; name: string; description: string; url: string; iconUrl: string }
 export type Navigation = { version: number; menus: Menu[]; sites: Site[] }
-export type Payload = { owner: string; authenticated: boolean; navigation: Navigation; favorites: string[] }
+export type Payload = { owner: string; authenticated: boolean; navigation: Navigation; favorites: string[]; allowRegister?: boolean }
 
 export const AUTH_KEY = 'navigation_session'
 

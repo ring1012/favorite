@@ -167,3 +167,146 @@ export function SiteDialog({
     </Dialog>
   )
 }
+
+async function sha256(value: string): Promise<string> {
+  const hash = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+  return Array.from(new Uint8Array(hash))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+export function RegisterDialog({ onClose, onDone }: { onClose: () => void; onDone: (username?: string) => void }) {
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [usernameError, setUsernameError] = useState('')
+  const [usernameSuccess, setUsernameSuccess] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const checkUsername = async () => {
+    const trimmed = username.trim().toLowerCase()
+    if (!trimmed) {
+      setUsernameError('')
+      setUsernameSuccess('')
+      return
+    }
+    if (trimmed.length < 3 || trimmed.length > 20) {
+      setUsernameError('用户名长度需在3-20个字符之间。')
+      setUsernameSuccess('')
+      return
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
+      setUsernameError('用户名仅支持字母、数字和下划线。')
+      setUsernameSuccess('')
+      return
+    }
+
+    try {
+      const data = await api(`/api/auth/check-username?username=${encodeURIComponent(trimmed)}`)
+      if (data.exists) {
+        setUsernameError('该用户名已被占用。')
+        setUsernameSuccess('')
+      } else {
+        setUsernameError('')
+        setUsernameSuccess('该用户名可用。')
+      }
+    } catch {
+      // Ignore network errors or check failures silenty
+    }
+  }
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (loading) return
+    setError('')
+
+    const trimmedUsername = username.trim().toLowerCase()
+    if (!trimmedUsername) {
+      setError('请输入用户名。')
+      return
+    }
+    if (password.length < 8) {
+      setError('密码至少为8个字符。')
+      return
+    }
+    if (password !== confirmPassword) {
+      setError('两次输入的密码不一致。')
+      return
+    }
+    if (usernameError) {
+      setError('请先解决用户名错误。')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const hashed = await sha256(password)
+      const result = await api('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ username: trimmedUsername, passwordHash: hashed }),
+      })
+      if (result.token) setAuthToken(result.token)
+      onDone(result.username || trimmedUsername)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '注册失败，请稍后重试。')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Dialog title="创建新账户" onClose={onClose}>
+      <form className="space-y-4" onSubmit={submit}>
+        <div>
+          <Field
+            label="用户名"
+            name="username"
+            placeholder="3-20个字符，仅支持字母、数字和下划线"
+            required
+            disabled={loading}
+            value={username}
+            onChange={(e) => {
+              setUsername(e.target.value)
+              setUsernameError('')
+              setUsernameSuccess('')
+            }}
+            onBlur={checkUsername}
+          />
+          {usernameError && <p className="mt-1 text-xs text-rose-300">{usernameError}</p>}
+          {usernameSuccess && <p className="mt-1 text-xs text-emerald-400">{usernameSuccess}</p>}
+        </div>
+        <Field
+          label="密码"
+          type="password"
+          name="password"
+          placeholder="至少 8 个字符"
+          minLength={8}
+          required
+          disabled={loading}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <Field
+          label="确认密码"
+          type="password"
+          name="confirmPassword"
+          placeholder="请再次输入密码"
+          minLength={8}
+          required
+          disabled={loading}
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+        />
+        {error && <p className="text-sm text-rose-300">{error}</p>}
+        <button
+          className="button-primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+          type="submit"
+          disabled={loading}
+        >
+          {loading ? '注册中...' : '注册'}
+        </button>
+      </form>
+    </Dialog>
+  )
+}
