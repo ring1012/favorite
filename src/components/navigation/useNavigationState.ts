@@ -149,6 +149,85 @@ export function useNavigationState(initialData?: Payload, expectedUser?: string)
     [data.navigation.menus, scheduleCacheRefresh]
   )
 
+  /**
+   * Move a menu to a different parent (or promote to root).
+   * asChild=true  → make source a child of target's root
+   * asChild=false → promote source to root level (sibling of target's root)
+   */
+  const moveMenu = useCallback(
+    async (sourceId: string, targetId: string, asChild: boolean) => {
+      if (sourceId === targetId) return
+      const menus = data.navigation.menus
+      const source = menus.find((m) => m.id === sourceId)
+      const target = menus.find((m) => m.id === targetId)
+      if (!source || !target) return
+      if (source.id === LIKE_MENU_ID) return
+
+      // Determine new parent: for asChild, parent is the target root
+      const newParentId = asChild
+        ? (target.parentId ? target.parentId : target.id)  // target root or target's own parent
+        : null  // promote to root
+
+      // Prevent making a root-with-children into a sub-menu (backend also blocks this)
+      if (asChild) {
+        const hasChildren = menus.some((m) => m.parentId === source.id)
+        if (hasChildren) {
+          setNotice('含有子分类的菜单不能移动到其他菜单下。')
+          return
+        }
+      }
+
+      // Optimistic update: re-parent source in local state
+      const updatedSource = { ...source, parentId: newParentId }
+      let newMenus: typeof menus
+
+      if (asChild) {
+        // Remove source, then insert it after the last child of newParentId
+        const withoutSource = menus.filter((m) => m.id !== source.id)
+        let insertIdx = withoutSource.findIndex((m) => m.id === newParentId)
+        // Find last child of newParentId
+        withoutSource.forEach((m, i) => { if (m.parentId === newParentId) insertIdx = i })
+        newMenus = [
+          ...withoutSource.slice(0, insertIdx + 1),
+          updatedSource,
+          ...withoutSource.slice(insertIdx + 1),
+        ]
+      } else {
+        // Promote to root: remove source and its children from current position,
+        // insert source as root before the target root
+        const withoutSource = menus.filter((m) => m.id !== source.id)
+        const targetRootId = target.parentId ? target.parentId : target.id
+        const targetRootIdx = withoutSource.findIndex((m) => m.id === targetRootId)
+        newMenus = [
+          ...withoutSource.slice(0, targetRootIdx),
+          updatedSource,
+          ...withoutSource.slice(targetRootIdx),
+        ]
+      }
+
+      setData((prev) => ({ ...prev, navigation: { ...prev.navigation, menus: newMenus } }))
+      try {
+        const result = (await api('/api/navigation', {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'move-menu',
+            id: source.id,
+            newParentId,
+          }),
+        })) as Payload
+        const otherMenus = (result.navigation.menus || []).filter((m) => m.id !== LIKE_MENU_ID)
+        result.navigation.menus = [{ id: LIKE_MENU_ID, name: '收藏', parentId: null }, ...otherMenus]
+        setData(result)
+        scheduleCacheRefresh()
+      } catch (error) {
+        setNotice(error instanceof Error ? error.message : '无法移动菜单。')
+        // Rollback
+        setData((prev) => ({ ...prev, navigation: { ...prev.navigation, menus } }))
+      }
+    },
+    [data.navigation.menus, scheduleCacheRefresh]
+  )
+
   const reorderSite = (sourceId: string, targetId: string) => {
     if (sourceId === targetId) return
     const sites = [...data.navigation.sites]
@@ -428,6 +507,7 @@ export function useNavigationState(initialData?: Payload, expectedUser?: string)
     handleForceRefresh,
     reorderSite,
     reorderMenu,
+    moveMenu,
     refresh,
     mutate,
     deleteItem,

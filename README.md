@@ -17,7 +17,12 @@
 | 变量名 | 说明 | 示例 |
 | --- | --- | --- |
 | `JWT_SECRET` | 用于 JWT 签名与校验的密钥（**必须不少于 32 位字符**）。 | `your_super_secret_jwt_key_at_least_32_chars` |
-| `NAV_HOST` | 服务端 ISR 数据 Fetch 所需的主机路径（按绑定域名设定）。 | `http://localhost:8088` |
+| `NAV_HOST` | 服务端 ISR 数据 Fetch 所需的主机绝对路径。 | `http://localhost:8088` |
+
+> [!NOTE]
+> **关于 `NAV_HOST` 的重要说明**：  
+> 用户页面 `/nav/[user]` 使用了 Next.js 的 ISR（增量静态生成）机制以获得最佳的加载性能。在服务端进行静态生成或后台定时更新（Revalidation）时，由于**没有真实的 HTTP 客户端请求**，代码中无法使用 `headers()` 或 `cookies()` 来动态获取当前主机的 Host 与协议（否则 Next.js 会将该路由强制降级为每次请求实时渲染的**动态渲染 (Dynamic Rendering)**，导致静态缓存失效）。  
+> 因此，必须通过 `NAV_HOST` 环境变量提供服务端发起数据请求时的绝对 API 地址，以保证 ISR 静态预生成能够顺利完成。
 
 ## KV 数据结构 (`fkv`)
 

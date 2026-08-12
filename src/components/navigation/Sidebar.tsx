@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useRef, useState } from 'react'
 import {
   ChevronDown,
   ChevronRight,
@@ -14,6 +14,16 @@ import {
   Trash2,
 } from 'lucide-react'
 import { LIKE_MENU_ID, Menu } from './types'
+
+// Horizontal offset threshold (px from left of sidebar item) beyond which
+// a drop is interpreted as "make source a child of target" rather than
+// a same-level reorder / root promotion.
+const CHILD_INTENT_THRESHOLD = 36
+
+interface DropState {
+  targetId: string
+  intent: 'sibling' | 'child'
+}
 
 interface SidebarProps {
   menus: Menu[]
@@ -36,6 +46,7 @@ interface SidebarProps {
   onEditMenu: (menu: { id: string; name: string }) => void
   onDeleteMenu: (id: string) => void
   onReorderMenu: (sourceId: string, targetId: string) => void
+  onMoveMenu: (sourceId: string, targetId: string, asChild: boolean) => void
 }
 
 export function Sidebar({
@@ -53,15 +64,33 @@ export function Sidebar({
   isSubmitting,
   menuDraggingId,
   setMenuDraggingId,
-  menuDragOverId,
   setMenuDragOverId,
   onAddMenu,
   onEditMenu,
   onDeleteMenu,
   onReorderMenu,
+  onMoveMenu,
 }: SidebarProps) {
   const roots = menus.filter((menu) => !menu.parentId)
+  const [dropState, setDropState] = useState<DropState | null>(null)
+  const sidebarRef = useRef<HTMLElement>(null)
 
+  const clearDrag = () => {
+    setMenuDraggingId(null)
+    setMenuDragOverId(null)
+    setDropState(null)
+  }
+
+  // ─── Compute drop intent from mouse X relative to sidebar left edge ─────
+  const getIntent = (e: React.DragEvent): 'sibling' | 'child' => {
+    const sidebar = sidebarRef.current
+    if (!sidebar) return 'sibling'
+    const rect = sidebar.getBoundingClientRect()
+    const relX = e.clientX - rect.left
+    return relX > CHILD_INTENT_THRESHOLD ? 'child' : 'sibling'
+  }
+
+  // ─── Root drag handlers ──────────────────────────────────────────────────
   const handleRootDragStart = (e: React.DragEvent, id: string) => {
     setMenuDraggingId(id)
     e.dataTransfer.effectAllowed = 'move'
@@ -70,23 +99,43 @@ export function Sidebar({
   const handleRootDragOver = (e: React.DragEvent, id: string) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
-    if (id !== menuDraggingId) setMenuDragOverId(id)
+    if (id === menuDraggingId) return
+    const intent = getIntent(e)
+    setDropState({ targetId: id, intent })
+    setMenuDragOverId(id)
   }
 
   const handleRootDrop = (e: React.DragEvent, targetId: string) => {
     e.preventDefault()
-    if (menuDraggingId && menuDraggingId !== targetId) {
-      // Only allow root-to-root reorder
-      const source = menus.find((m) => m.id === menuDraggingId)
-      const target = menus.find((m) => m.id === targetId)
-      if (source && target && !source.parentId && !target.parentId) {
-        onReorderMenu(menuDraggingId, targetId)
+    if (!menuDraggingId || menuDraggingId === targetId) { clearDrag(); return }
+    const source = menus.find((m) => m.id === menuDraggingId)
+    const target = menus.find((m) => m.id === targetId)
+    if (!source || !target) { clearDrag(); return }
+
+    const intent = getIntent(e)
+
+    if (!source.parentId && !target.parentId) {
+      // root → root
+      if (intent === 'child') {
+        // root wants to become child of target root
+        onMoveMenu(source.id, target.id, true)
+      } else {
+        onReorderMenu(source.id, target.id)
+      }
+    } else if (source.parentId && !target.parentId) {
+      // child → root
+      if (intent === 'child') {
+        // child wants to become child of this root
+        onMoveMenu(source.id, target.id, true)
+      } else {
+        // child wants to be promoted to root (sibling of target)
+        onMoveMenu(source.id, target.id, false)
       }
     }
-    setMenuDraggingId(null)
-    setMenuDragOverId(null)
+    clearDrag()
   }
 
+  // ─── Child drag handlers ─────────────────────────────────────────────────
   const handleChildDragStart = (e: React.DragEvent, id: string) => {
     e.stopPropagation()
     setMenuDraggingId(id)
@@ -97,25 +146,31 @@ export function Sidebar({
     e.preventDefault()
     e.stopPropagation()
     e.dataTransfer.dropEffect = 'move'
-    if (id !== menuDraggingId) setMenuDragOverId(id)
+    if (id === menuDraggingId) return
+    const intent = getIntent(e)
+    setDropState({ targetId: id, intent })
+    setMenuDragOverId(id)
   }
 
   const handleChildDrop = (e: React.DragEvent, targetId: string) => {
     e.preventDefault()
     e.stopPropagation()
-    if (menuDraggingId && menuDraggingId !== targetId) {
-      const source = menus.find((m) => m.id === menuDraggingId)
-      const target = menus.find((m) => m.id === targetId)
-      if (source && target && source.parentId && source.parentId === target.parentId) {
-        onReorderMenu(menuDraggingId, targetId)
-      }
+    if (!menuDraggingId || menuDraggingId === targetId) { clearDrag(); return }
+    const source = menus.find((m) => m.id === menuDraggingId)
+    const target = menus.find((m) => m.id === targetId)
+    if (!source || !target) { clearDrag(); return }
+
+    // child → child (same or different parent): always sibling reorder within same parent
+    if (source.parentId === target.parentId) {
+      onReorderMenu(source.id, target.id)
     }
-    setMenuDraggingId(null)
-    setMenuDragOverId(null)
+    clearDrag()
   }
 
+  // ─── Render ──────────────────────────────────────────────────────────────
   return (
     <aside
+      ref={sidebarRef}
       className={`shrink-0 rounded-2xl p-2.5 shadow-[0_12px_40px_rgba(0,0,0,.3),inset_0_1px_0_rgba(255,255,255,.04)] backdrop-blur-sm transition-all duration-300 ${
         mobileNavOpen
           ? 'fixed inset-y-0 left-0 z-40 w-64 max-w-[80vw] overflow-y-auto rounded-none bg-[#15151e]/95'
@@ -124,6 +179,7 @@ export function Sidebar({
         sidebarCollapsed ? 'lg:w-0 lg:overflow-hidden lg:p-0' : 'lg:w-52 lg:max-w-none lg:overflow-visible lg:rounded-2xl lg:bg-white/[.03]'
       }`}
     >
+      {/* Header */}
       <div className="mb-2 flex items-center justify-between px-1">
         <div className="flex items-center gap-1.5">
           <button
@@ -154,22 +210,28 @@ export function Sidebar({
           const isRootActive = activeMenu === root.id
           const isLike = root.id === LIKE_MENU_ID
           const isDraggingThis = menuDraggingId === root.id
-          const isDragOver = menuDragOverId === root.id
+          const isDropTarget = dropState?.targetId === root.id && menuDraggingId !== root.id
+          const dropIntent = isDropTarget ? dropState!.intent : null
 
           return (
             <div
               key={root.id}
-              className={`space-y-0.5 transition-opacity duration-150 ${isDraggingThis ? 'opacity-40' : 'opacity-100'}`}
+              className={`space-y-0.5 transition-opacity duration-150 ${isDraggingThis ? 'opacity-30' : 'opacity-100'}`}
               draggable={editMode && !isLike}
               onDragStart={editMode && !isLike ? (e) => handleRootDragStart(e, root.id) : undefined}
               onDragOver={editMode && !isLike ? (e) => handleRootDragOver(e, root.id) : undefined}
               onDrop={editMode && !isLike ? (e) => handleRootDrop(e, root.id) : undefined}
-              onDragEnd={() => { setMenuDraggingId(null); setMenuDragOverId(null) }}
+              onDragEnd={clearDrag}
             >
+              {/* Drop indicator line (sibling) */}
+              {isDropTarget && dropIntent === 'sibling' && (
+                <div className="mx-1 h-0.5 rounded-full bg-blue-400/70 shadow-[0_0_6px_rgba(96,165,250,.6)]" />
+              )}
+
               <div
                 className={`group relative flex items-center justify-between rounded-lg px-2 py-[7px] text-[13px] font-medium transition-all duration-200 cursor-pointer ${
-                  isDragOver && !isDraggingThis
-                    ? 'ring-2 ring-blue-400/60 bg-blue-500/10'
+                  isDropTarget && dropIntent === 'child'
+                    ? 'ring-2 ring-violet-400/60 bg-violet-500/10'
                     : isRootActive
                     ? 'bg-gradient-to-r from-blue-500/20 to-violet-500/10 text-blue-50 font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,.06)]'
                     : 'text-slate-400 hover:bg-white/[.05] hover:text-slate-100'
@@ -258,74 +320,100 @@ export function Sidebar({
                 )}
               </div>
 
+              {/* Sub-menu list with visual hierarchy */}
               {open && children.length > 0 && (
-                <div className="ml-3.5 pl-2 space-y-0.5 mt-0.5">
-                  {children.map((child) => {
-                    const isChildActive = activeMenu === child.id
-                    const isChildDragging = menuDraggingId === child.id
-                    const isChildDragOver = menuDragOverId === child.id
-                    return (
-                      <div
-                        key={child.id}
-                        className={`group flex items-center justify-between rounded-lg px-2 py-[6px] text-[13px] transition-all cursor-pointer ${
-                          isChildDragging
-                            ? 'opacity-40'
-                            : isChildDragOver
-                            ? 'ring-2 ring-blue-400/60 bg-blue-500/10'
-                            : isChildActive
-                            ? 'bg-blue-500/[.14] font-semibold text-blue-50'
-                            : 'text-slate-500 hover:bg-white/[.05] hover:text-slate-200'
-                        }`}
-                        draggable={editMode}
-                        onDragStart={editMode ? (e) => handleChildDragStart(e, child.id) : undefined}
-                        onDragOver={editMode ? (e) => handleChildDragOver(e, child.id) : undefined}
-                        onDrop={editMode ? (e) => handleChildDrop(e, child.id) : undefined}
-                        onDragEnd={() => { setMenuDraggingId(null); setMenuDragOverId(null) }}
-                        onClick={() => {
-                          setActiveMenu(child.id)
-                          onNavigate()
-                        }}
-                      >
-                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                          {editMode && (
-                            <span
-                              className="shrink-0 cursor-grab text-slate-600 hover:text-slate-400 active:cursor-grabbing"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <GripVertical size={12} />
-                            </span>
+                <div className="relative ml-4 mt-0.5">
+                  {/* Left border line — tree connector */}
+                  <div className="absolute left-0 top-1 bottom-1 w-px bg-gradient-to-b from-white/[.10] via-white/[.06] to-transparent rounded-full" />
+
+                  <div className="pl-3 space-y-px">
+                    {children.map((child) => {
+                      const isChildActive = activeMenu === child.id
+                      const isChildDragging = menuDraggingId === child.id
+                      const isChildDrop = dropState?.targetId === child.id && menuDraggingId !== child.id
+
+                      return (
+                        <div key={child.id}>
+                          {/* Drop indicator line above child */}
+                          {isChildDrop && (
+                            <div className="mx-1 h-0.5 rounded-full bg-blue-400/70 shadow-[0_0_6px_rgba(96,165,250,.6)] mb-px" />
                           )}
-                          <span className="truncate flex-1">{child.name}</span>
-                        </div>
-                        {authenticated && editMode && (
-                          <div className="hidden items-center gap-1 pr-1 group-hover:flex">
-                            <button
-                              title="编辑分类"
-                              disabled={isSubmitting}
-                              className="icon-button p-0.5"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                onEditMenu({ id: child.id, name: child.name })
-                              }}
-                            >
-                              <Pencil size={12} />
-                            </button>
-                            <button
-                              title="删除分类"
-                              disabled={isSubmitting}
-                              className="icon-button p-0.5 text-rose-300"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                onDeleteMenu(child.id)
-                              }}
-                            >
-                              <Trash2 size={12} />
-                            </button>
+                          <div
+                            className={`group flex items-center justify-between rounded-md px-2 py-[5px] text-[12px] transition-all cursor-pointer ${
+                              isChildDragging
+                                ? 'opacity-30'
+                                : isChildActive
+                                ? 'bg-violet-500/[.18] font-semibold text-violet-100 shadow-[inset_0_1px_0_rgba(255,255,255,.04)]'
+                                : 'text-slate-500 hover:bg-white/[.04] hover:text-slate-300'
+                            }`}
+                            draggable={editMode}
+                            onDragStart={editMode ? (e) => handleChildDragStart(e, child.id) : undefined}
+                            onDragOver={editMode ? (e) => handleChildDragOver(e, child.id) : undefined}
+                            onDrop={editMode ? (e) => handleChildDrop(e, child.id) : undefined}
+                            onDragEnd={clearDrag}
+                            onClick={() => {
+                              setActiveMenu(child.id)
+                              onNavigate()
+                            }}
+                          >
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                              {editMode && (
+                                <span
+                                  className="shrink-0 cursor-grab text-slate-700 hover:text-slate-400 active:cursor-grabbing"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <GripVertical size={11} />
+                                </span>
+                              )}
+                              {/* Small dash connector */}
+                              <span className={`shrink-0 text-[10px] leading-none ${isChildActive ? 'text-violet-400' : 'text-slate-600'}`}>
+                                ─
+                              </span>
+                              <span className="truncate flex-1">{child.name}</span>
+                            </div>
+                            {authenticated && editMode && (
+                              <div className="hidden items-center gap-1 pr-0.5 group-hover:flex">
+                                <button
+                                  title="编辑分类"
+                                  disabled={isSubmitting}
+                                  className="icon-button p-0.5"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    onEditMenu({ id: child.id, name: child.name })
+                                  }}
+                                >
+                                  <Pencil size={11} />
+                                </button>
+                                <button
+                                  title="删除分类"
+                                  disabled={isSubmitting}
+                                  className="icon-button p-0.5 text-rose-300"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    onDeleteMenu(child.id)
+                                  }}
+                                >
+                                  <Trash2 size={11} />
+                                </button>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    )
-                  })}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Drop hint for child intent: show indented placeholder */}
+              {isDropTarget && dropIntent === 'child' && (
+                <div className="ml-4 pl-3 mt-px">
+                  <div className="flex items-center gap-1.5 rounded-md px-2 py-[5px] border border-dashed border-violet-400/40 text-[11px] text-violet-400/60">
+                    <span>─</span>
+                    <span className="truncate">
+                      {menus.find((m) => m.id === menuDraggingId)?.name ?? ''}
+                    </span>
+                  </div>
                 </div>
               )}
             </div>

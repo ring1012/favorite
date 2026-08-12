@@ -61,6 +61,7 @@ export default function NavigationApp({
     handleForceRefresh,
     reorderSite,
     reorderMenu,
+    moveMenu,
     refresh,
     mutate,
     deleteItem,
@@ -147,6 +148,7 @@ export default function NavigationApp({
             onEditMenu={(menu) => setMenuEditor(menu)}
             onDeleteMenu={(id) => deleteItem('menu', id)}
             onReorderMenu={reorderMenu}
+            onMoveMenu={moveMenu}
           />
 
           {/* Main Content Component */}
