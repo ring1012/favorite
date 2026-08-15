@@ -49,7 +49,7 @@ export function useNavigationState(initialData?: Payload, expectedUser?: string)
       if (!window.location.pathname.startsWith('/nav/')) return
       fetch(window.location.href, { cache: 'reload' }).catch(() => {})
     }, 300)
-  }, [])
+0  }, [])
 
   const handleForceRefresh = useCallback(() => {
     if (typeof window !== 'undefined') {

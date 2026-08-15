@@ -189,16 +189,17 @@ export function Sidebar({
           >
             {sidebarCollapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
           </button>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">导航分类</span>
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 lg:text-[10px]">导航分类</span>
         </div>
         {authenticated && editMode && (
           <button
             title="添加分类"
             disabled={isSubmitting}
             onClick={() => onAddMenu(null)}
-            className="icon-button p-1 disabled:opacity-50"
+            className="icon-button p-1.5 lg:p-1 disabled:opacity-50"
           >
-            <Plus size={13} />
+            <Plus size={16} className="lg:hidden" />
+            <Plus size={13} className="hidden lg:block" />
           </button>
         )}
       </div>
@@ -229,7 +230,7 @@ export function Sidebar({
               )}
 
               <div
-                className={`group relative flex items-center justify-between rounded-lg px-2 py-[7px] text-[13px] font-medium transition-all duration-200 cursor-pointer ${
+                className={`group relative flex items-center justify-between rounded-lg px-3 py-3 text-[15px] font-medium transition-all duration-200 cursor-pointer lg:px-2 lg:py-[7px] lg:text-[13px] ${
                   isDropTarget && dropIntent === 'child'
                     ? 'ring-2 ring-violet-400/60 bg-violet-500/10'
                     : isRootActive
@@ -241,20 +242,21 @@ export function Sidebar({
                   onNavigate()
                 }}
               >
-                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                <div className="flex items-center gap-2 min-w-0 flex-1 lg:gap-1.5">
                   {editMode && !isLike && (
                     <span
                       className="shrink-0 cursor-grab text-slate-600 hover:text-slate-400 active:cursor-grabbing"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <GripVertical size={12} />
+                      <GripVertical size={16} className="lg:hidden" />
+                      <GripVertical size={12} className="hidden lg:block" />
                     </span>
                   )}
 
                   {children.length > 0 ? (
                     <button
                       type="button"
-                      className="p-0.5 rounded text-slate-500 hover:bg-white/10 hover:text-slate-200"
+                      className="p-1.5 rounded text-slate-500 hover:bg-white/10 hover:text-slate-200 lg:p-0.5"
                       onClick={(e) => {
                         e.stopPropagation()
                         setExpanded((items) =>
@@ -262,14 +264,18 @@ export function Sidebar({
                         )
                       }}
                     >
-                      {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                      {open ? <ChevronDown size={18} className="lg:hidden" /> : <ChevronRight size={18} className="lg:hidden" />}
+                      {open ? <ChevronDown size={12} className="hidden lg:block" /> : <ChevronRight size={12} className="hidden lg:block" />}
                     </button>
                   ) : (
-                    <span className="w-3.5 shrink-0" />
+                    <span className="w-4 shrink-0 lg:w-3.5" />
                   )}
 
                   {isLike ? (
-                    <Heart size={12} className="fill-rose-500 text-rose-500 shrink-0" />
+                    <>
+                      <Heart size={18} className="fill-rose-500 text-rose-500 shrink-0 lg:hidden" />
+                      <Heart size={12} className="fill-rose-500 text-rose-500 shrink-0 hidden lg:block" />
+                    </>
                   ) : (
                     <div
                       className={`h-1.5 w-1.5 rounded-full shrink-0 ${
@@ -339,7 +345,7 @@ export function Sidebar({
                             <div className="mx-1 h-0.5 rounded-full bg-blue-400/70 shadow-[0_0_6px_rgba(96,165,250,.6)] mb-px" />
                           )}
                           <div
-                            className={`group flex items-center justify-between rounded-md px-2 py-[5px] text-[12px] transition-all cursor-pointer ${
+                            className={`group flex items-center justify-between rounded-md px-3 py-3 text-[14px] transition-all cursor-pointer lg:px-2 lg:py-[5px] lg:text-[12px] ${
                               isChildDragging
                                 ? 'opacity-30'
                                 : isChildActive
@@ -356,17 +362,18 @@ export function Sidebar({
                               onNavigate()
                             }}
                           >
-                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                            <div className="flex items-center gap-2 min-w-0 flex-1 lg:gap-1.5">
                               {editMode && (
                                 <span
                                   className="shrink-0 cursor-grab text-slate-700 hover:text-slate-400 active:cursor-grabbing"
                                   onClick={(e) => e.stopPropagation()}
                                 >
-                                  <GripVertical size={11} />
+                                  <GripVertical size={15} className="lg:hidden" />
+                                  <GripVertical size={11} className="hidden lg:block" />
                                 </span>
                               )}
                               {/* Small dash connector */}
-                              <span className={`shrink-0 text-[10px] leading-none ${isChildActive ? 'text-violet-400' : 'text-slate-600'}`}>
+                              <span className={`shrink-0 text-[12px] leading-none lg:text-[10px] ${isChildActive ? 'text-violet-400' : 'text-slate-600'}`}>
                                 ─
                               </span>
                               <span className="truncate flex-1">{child.name}</span>
